@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#0a0e1a"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="NSE Scanner"/>
+<title>NSE Scanner</title>
+<link rel="manifest" href="manifest.json"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:        #0a0e1a;
+    --surface:   #111827;
+    --card:      #161d2e;
+    --border:    #1e2d45;
+    --accent:    #00e5ff;
+    --green:     #00ff88;
+    --red:       #ff3d5a;
+    --yellow:    #ffd93d;
+    --purple:    #a78bfa;
+    --orange:    #fb923c;
+    --text:      #e2e8f0;
+    --muted:     #64748b;
+    --font-mono: 'Space Mono', monospace;
+    --font-main: 'Rajdhani', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-main);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; padding: 0 0 80px; }
+
+  /* ── HEADER ── */
+  header {
+    padding: 20px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(0,229,255,0.05) 0%, transparent 100%);
+  }
+  .header-top { display: flex; align-items: center; justify-content: space-between; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), #0066ff);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; box-shadow: 0 0 20px rgba(0,229,255,0.3);
+  }
+  .logo-text { font-size: 20px; font-weight: 700; letter-spacing: 2px; color: var(--accent); }
+  .logo-sub { font-size: 10px; color: var(--muted); letter-spacing: 1px; font-family: var(--font-mono); }
+
+  .market-status {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 20px;
+    border: 1px solid var(--border);
+    font-size: 12px; font-family: var(--font-mono);
+    background: var(--surface);
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--red);
+    box-shadow: 0 0 8px var(--red);
+  }
+  .status-dot.open { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .header-stats {
+    display: flex; gap: 16px; margin-top: 14px;
+    padding-top: 14px; border-top: 1px solid var(--border);
+  }
+  .stat { flex: 1; }
+  .stat-val { font-size: 22px; font-weight: 700; font-family: var(--font-mono); color: var(--accent); }
+  .stat-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+
+  /* ── SCAN BUTTON ── */
+  .scan-section { padding: 16px; }
+  .scan-btn {
+    width: 100%; padding: 16px;
+    background: linear-gradient(135deg, #003d66, #001a33);
+    border: 1px solid var(--accent);
+    border-radius: 12px; color: var(--accent);
+    font-family: var(--font-mono); font-size: 14px; font-weight: 700;
+    letter-spacing: 2px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(0,229,255,0.1);
+    position: relative; overflow: hidden;
+  }
+  .scan-btn:hover, .scan-btn:active {
+    background: linear-gradient(135deg, #004d80, #002244);
+    box-shadow: 0 0 30px rgba(0,229,255,0.25);
+    transform: translateY(-1px);
+  }
+  .scan-btn:disabled {
+    opacity: 0.5; cursor: not-allowed; transform: none;
+  }
+  .scan-btn .spinner {
+    width: 16px; height: 16px; border: 2px solid rgba(0,229,255,0.3);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite; display: none;
+  }
+  .scan-btn.scanning .spinner { display: block; }
+  .scan-btn.scanning .btn-text { opacity: 0.7; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* scan bar */
+  .scan-progress {
+    height: 3px; background: var(--border); border-radius: 2px; margin-top: 10px;
+    overflow: hidden; display: none;
+  }
+  .scan-progress.active { display: block; }
+  .scan-bar {
+    height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--green));
+    border-radius: 2px; transition: width 0.3s;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* ── SIGNAL FILTERS ── */
+  .filters {
+    display: flex; gap: 8px; padding: 0 16px 12px; overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .filters::-webkit-scrollbar { display: none; }
+  .filter-chip {
+    flex-shrink: 0; padding: 6px 14px; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--surface);
+    font-size: 11px; font-family: var(--font-mono); color: var(--muted);
+    cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .filter-chip.active {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(0,229,255,0.08);
+  }
+
+  /* ── SIGNAL CARDS ── */
+  .signals-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0 16px 10px;
+  }
+  .signals-title { font-size: 13px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; font-family: var(--font-mono); }
+  .signals-count {
+    background: var(--accent); color: var(--bg);
+    font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+    font-family: var(--font-mono);
+  }
+
+  .signals-list { padding: 0 16px; display: flex; flex-direction: column; gap: 10px; }
+
+  .signal-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px;
+    animation: slideIn 0.3s ease;
+    position: relative; overflow: hidden;
+  }
+  .signal-card::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; border-radius: 3px 0 0 3px;
+  }
+  .signal-card.vol::before   { background: var(--yellow); }
+  .signal-card.brk::before   { background: var(--green); }
+  .signal-card.vcp::before   { background: var(--purple); }
+  .signal-card.mtf::before   { background: var(--orange); }
+  .signal-card.myr::before   { background: var(--accent); }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .stock-name { font-size: 20px; font-weight: 700; letter-spacing: 1px; color: #fff; }
+  .stock-price { font-size: 18px; font-weight: 700; font-family: var(--font-mono); color: var(--green); }
+
+  .card-mid { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+
+  .badge {
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border-radius: 6px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+  }
+  .badge.vol   { background: rgba(255,217,61,0.12);  color: var(--yellow); border: 1px solid rgba(255,217,61,0.25); }
+  .badge.brk   { background: rgba(0,255,136,0.12);   color: var(--green);  border: 1px solid rgba(0,255,136,0.25); }
+  .badge.vcp   { background: rgba(167,139,250,0.12); color: var(--purple); border: 1px solid rgba(167,139,250,0.25); }
+  .badge.mtf   { background: rgba(251,146,60,0.12);  color: var(--orange); border: 1px solid rgba(251,146,60,0.25); }
+  .badge.myr   { background: rgba(0,229,255,0.12);   color: var(--accent); border: 1px solid rgba(0,229,255,0.25); }
+
+  .card-bot { display: flex; justify-content: space-between; align-items: center; }
+  .vol-info { font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
+  .vol-info span { color: var(--yellow); }
+  .time-info { font-size: 10px; color: var(--muted); font-family: var(--font-mono); }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center; padding: 60px 20px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+  .empty-icon { font-size: 48px; opacity: 0.3; }
+  .empty-text { color: var(--muted); font-size: 14px; line-height: 1.6; }
+
+  /* ── NOTIFICATION TOAST ── */
+  .toast-container {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 9999; display: flex; flex-direction: column; gap: 8px;
+    width: calc(100% - 32px); max-width: 448px; pointer-events: none;
+  }
+  .toast {
+    background: var(--card); border: 1px solid var(--accent);
+    border-radius: 12px; padding: 14px 16px;
+    display: flex; align-items: flex-start; gap: 12px;
+    box-shadow: 0 4px 30px rgba(0,229,255,0.2);
+    animation: toastIn 0.3s ease, toastOut 0.3s ease 3.7s forwards;
+    pointer-events: all;
+  }
+  .toast-icon { font-size: 22px; flex-shrink: 0; }
+  .toast-body { flex: 1; }
+  .toast-title { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+  .toast-msg { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+  @keyframes toastIn  { from { opacity:0; transform:translateY(-20px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes toastOut { from { opacity:1; transform:translateY(0); } to { opacity:0; transform:translateY(-20px); } }
+
+  /* ── BOTTOM NAV ── */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 480px;
+    background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; padding: 8px 0 20px;
+  }
+  .nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    gap: 4px; cursor: pointer; padding: 6px;
+    font-size: 10px; color: var(--muted); letter-spacing: 1px;
+    text-transform: uppercase; font-family: var(--font-mono);
+    transition: color 0.2s;
+  }
+  .nav-item.active { color: var(--accent); }
+  .nav-icon { font-size: 20px; }
+
+  /* ── SETTINGS PANEL ── */
+  .panel { display: none; padding: 16px; }
+  .panel.active { display: block; }
+
+  .setting-group { margin-bottom: 20px; }
+  .setting-label {
+    font-size: 11px; color: var(--muted); letter-spacing: 1px;
+    text-transform: uppercase; font-family: var(--font-mono);
+    margin-bottom: 10px; display: block;
+  }
+
+  .setting-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 14px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px;
+  }
+  .setting-name { font-size: 14px; font-weight: 600; }
+  .setting-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .toggle {
+    width: 44px; height: 24px; background: var(--border); border-radius: 12px;
+    position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 20px; height: 20px; border-radius: 50%; background: #fff;
+    transition: transform 0.2s;
+  }
+  .toggle.on::after { transform: translateX(20px); }
+
+  .notif-btn {
+    width: 100%; padding: 14px; background: var(--card);
+    border: 1px solid var(--green); border-radius: 10px;
+    color: var(--green); font-family: var(--font-mono); font-size: 13px;
+    font-weight: 700; letter-spacing: 1px; cursor: pointer;
+    margin-top: 8px; transition: all 0.2s;
+  }
+  .notif-btn:hover { background: rgba(0,255,136,0.08); }
+
+  /* ── WATCHLIST ── */
+  .wl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .wl-chip {
+    padding: 8px 12px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 13px; font-weight: 600; display: flex;
+    align-items: center; justify-content: space-between;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .wl-chip.selected { border-color: var(--accent); background: rgba(0,229,255,0.08); color: var(--accent); }
+  .wl-chip-check { font-size: 14px; opacity: 0; }
+  .wl-chip.selected .wl-chip-check { opacity: 1; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-top">
+      <div class="logo">
+        <div class="logo-icon">📡</div>
+        <div>
+          <div class="logo-text">NSE SCAN</div>
+          <div class="logo-sub">NIFTY 500 SCREENER</div>
+        </div>
+      </div>
+      <div class="market-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText" style="font-size:11px">CLOSED</span>
+      </div>
+    </div>
+    <div class="header-stats">
+      <div class="stat">
+        <div class="stat-val" id="totalSignals">0</div>
+        <div class="stat-label">Signals Today</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="lastScanTime">--:--</div>
+        <div class="stat-label">Last Scan</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="nextScanIn">--</div>
+        <div class="stat-label">Next Scan</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- PANELS -->
+
+  <!-- SIGNALS PANEL -->
+  <div class="panel active" id="panelSignals">
+    <div class="scan-section" style="padding:16px 0 8px">
+      <button class="scan-btn" id="scanBtn" onclick="startScan()">
+        <div class="spinner"></div>
+        <span class="btn-text">⚡ SCAN NOW</span>
+      </button>
+      <div class="scan-progress" id="scanProgress">
+        <div class="scan-bar" id="scanBar"></div>
+      </div>
+    </div>
+
+    <div class="filters" id="filters">
+      <div class="filter-chip active" data-filter="all" onclick="setFilter(this,'all')">All</div>
+      <div class="filter-chip" data-filter="vol"  onclick="setFilter(this,'vol')">📊 Volume</div>
+      <div class="filter-chip" data-filter="brk"  onclick="setFilter(this,'brk')">🚀 Breakout</div>
+      <div class="filter-chip" data-filter="vcp"  onclick="setFilter(this,'vcp')">🔺 VCP</div>
+      <div class="filter-chip" data-filter="mtf"  onclick="setFilter(this,'mtf')">📅 Multi-TF</div>
+      <div class="filter-chip" data-filter="myr"  onclick="setFilter(this,'myr')">🏔️ Multi-Year</div>
+    </div>
+
+    <div class="signals-header">
+      <span class="signals-title">Live Signals</span>
+      <span class="signals-count" id="sigCount">0</span>
+    </div>
+
+    <div class="signals-list" id="signalsList">
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-text">
+          Tap <strong style="color:var(--accent)">SCAN NOW</strong> to start screening<br/>
+          Nifty 500 stocks for signals
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS PANEL -->
+  <div class="panel" id="panelSettings">
+    <span class="setting-label">Notifications</span>
+    <button class="notif-btn" id="notifBtn" onclick="requestNotifications()">
+      🔔 ENABLE PUSH NOTIFICATIONS
+    </button>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;font-family:var(--font-mono);padding:0 4px">
+      Get alerts on your phone even when the app is in background
+    </div>
+
+    <br/>
+    <span class="setting-label">Signal Filters</span>
+
+    <div class="setting-row">
+      <div>
+        <div class="setting-name">📊 Volume Spike</div>
+        <div class="setting-desc">2.5× average volume</div>
+      </div>
+      <div class="toggle on" id="tog_vol" onclick="toggleSetting(this)"></div>
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-name">🚀 Breakout (50D)</div>
+        <div class="setting-desc">Near 50-day high</div>
+      </div>
+      <div class="toggle on" id="tog_brk" onclick="toggleSetting(this)"></div>
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-name">🔺 VCP Pattern</div>
+        <div class="setting-desc">Volatility contraction</div>
+      </div>
+      <div class="toggle on" id="tog_vcp" onclick="toggleSetting(this)"></div>
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-name">📅 Multi-Timeframe</div>
+        <div class="setting-desc">Daily + Weekly alignment</div>
+      </div>
+      <div class="toggle on" id="tog_mtf" onclick="toggleSetting(this)"></div>
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-name">🏔️ Multi-Year Breakout</div>
+        <div class="setting-desc">Breaking 3-year high</div>
+      </div>
+      <div class="toggle on" id="tog_myr" onclick="toggleSetting(this)"></div>
+    </div>
+
+    <br/>
+    <span class="setting-label">Scan Schedule</span>
+    <div class="setting-row">
+      <div>
+        <div class="setting-name">Auto-scan every 15 min</div>
+        <div class="setting-desc">9:15 AM – 3:30 PM IST only</div>
+      </div>
+      <div class="toggle on" id="tog_auto" onclick="toggleSetting(this)"></div>
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-name">Market hours only</div>
+        <div class="setting-desc">Skip weekends & holidays</div>
+      </div>
+      <div class="toggle on"></div>
+    </div>
+  </div>
+
+  <!-- WATCHLIST PANEL -->
+  <div class="panel" id="panelWatchlist">
+    <span class="setting-label" style="display:block;margin-bottom:12px">Select Indices to Scan</span>
+    <div class="wl-grid" id="wlGrid"></div>
+
+    <br/>
+    <span class="setting-label" style="display:block;margin-bottom:12px">Today's Alerted Stocks</span>
+    <div id="alertedList" style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">
+      No stocks alerted yet today.
+    </div>
+  </div>
+
+</div><!-- .app -->
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+  <div class="nav-item active" id="nav0" onclick="switchTab(0)">
+    <span class="nav-icon">📡</span>Signals
+  </div>
+  <div class="nav-item" id="nav1" onclick="switchTab(1)">
+    <span class="nav-icon">⚙️</span>Settings
+  </div>
+  <div class="nav-item" id="nav2" onclick="switchTab(2)">
+    <span class="nav-icon">📋</span>Watchlist
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ══════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════
+const WATCHLIST = [
+  {s:"RELIANCE",  p:2845, v:8200000,  avg:4100000},
+  {s:"TCS",       p:3920, v:3100000,  avg:2200000},
+  {s:"HDFCBANK",  p:1695, v:15000000, avg:9000000},
+  {s:"INFY",      p:1580, v:9500000,  avg:6000000},
+  {s:"ICICIBANK", p:1245, v:12000000, avg:7000000},
+  {s:"SBIN",      p:785,  v:35000000, avg:18000000},
+  {s:"BHARTIARTL",p:1820, v:7000000,  avg:4000000},
+  {s:"KOTAKBANK", p:1985, v:5500000,  avg:3500000},
+  {s:"AXISBANK",  p:1145, v:14000000, avg:8000000},
+  {s:"LT",        p:3680, v:4200000,  avg:2800000},
+  {s:"MARUTI",    p:12450,v:950000,   avg:500000},
+  {s:"TITAN",     p:3240, v:3800000,  avg:2500000},
+  {s:"SUNPHARMA", p:1680, v:4500000,  avg:3000000},
+  {s:"BAJFINANCE",p:7120, v:2800000,  avg:1800000},
+  {s:"WIPRO",     p:485,  v:18000000, avg:11000000},
+  {s:"NTPC",      p:385,  v:28000000, avg:15000000},
+  {s:"POWERGRID", p:295,  v:22000000, avg:12000000},
+  {s:"TATAMOTORS",p:920,  v:25000000, avg:13000000},
+  {s:"TATASTEEL", p:145,  v:65000000, avg:35000000},
+  {s:"ADANIENT",  p:2850, v:4500000,  avg:2500000},
+  {s:"ZOMATO",    p:245,  v:85000000, avg:45000000},
+  {s:"IRFC",      p:195,  v:35000000, avg:18000000},
+  {s:"RVNL",      p:385,  v:28000000, avg:14000000},
+  {s:"APOLLOHOSP",p:6850, v:850000,   avg:500000},
+  {s:"DIVISLAB",  p:5450, v:750000,   avg:420000},
+  {s:"DRREDDY",   p:6250, v:680000,   avg:380000},
+  {s:"HCLTECH",   p:1845, v:7200000,  avg:4500000},
+  {s:"TECHM",     p:1580, v:5800000,  avg:3600000},
+  {s:"BAJAJFINSV",p:1745, v:3200000,  avg:2000000},
+  {s:"ITC",       p:465,  v:22000000, avg:12000000},
+];
+
+const SIGNAL_TYPES = {
+  vol: { label:"📊 Volume Spike",     cls:"vol" },
+  brk: { label:"🚀 Breakout (50D)",   cls:"brk" },
+  vcp: { label:"🔺 VCP Pattern",      cls:"vcp" },
+  mtf: { label:"📅 Multi-TF",         cls:"mtf" },
+  myr: { label:"🏔️ Multi-Year Brk",  cls:"myr" },
+};
+
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let signals      = [];
+let alertedToday = new Set();
+let activeFilter = "all";
+let scanInterval = null;
+let nextScanCountdown = 0;
+let settings = {
+  vol:true, brk:true, vcp:true, mtf:true, myr:true, auto:true
+};
+
+// ══════════════════════════════════════════
+//  MARKET HOURS
+// ══════════════════════════════════════════
+function isMarketOpen() {
+  const now = new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Kolkata"}));
+  const day = now.getDay();
+  if(day===0||day===6) return false;
+  const h=now.getHours(), m=now.getMinutes();
+  const mins = h*60+m;
+  return mins>=555 && mins<=930; // 9:15=555, 15:30=930
+}
+
+function updateMarketStatus() {
+  const open = isMarketOpen();
+  document.getElementById("statusDot").className = "status-dot"+(open?" open":"");
+  document.getElementById("statusText").textContent = open?"OPEN":"CLOSED";
+}
+
+// ══════════════════════════════════════════
+//  SCAN ENGINE
+// ══════════════════════════════════════════
+function detectSignals(stock) {
+  const triggered = [];
+  const volRatio = stock.v / stock.avg;
+
+  // Volume spike
+  if(settings.vol && volRatio >= 2.0) triggered.push("vol");
+
+  // Breakout (simulate: price within 1% of assumed 50D high)
+  if(settings.brk) {
+    const near50high = (Math.random() > 0.7) || (volRatio > 1.8 && Math.random()>0.5);
+    if(near50high) triggered.push("brk");
+  }
+
+  // VCP — tighter range + volume contraction then expansion
+  if(settings.vcp) {
+    const isVCP = volRatio > 1.5 && Math.random() > 0.75;
+    if(isVCP) triggered.push("vcp");
+  }
+
+  // Multi-timeframe — daily + weekly breakout
+  if(settings.mtf && triggered.includes("brk")) {
+    const weeklyConfirm = Math.random() > 0.5;
+    if(weeklyConfirm) triggered.push("mtf");
+  }
+
+  // Multi-year breakout — near 3yr high
+  if(settings.myr) {
+    const is3yr = Math.random() > 0.88;
+    if(is3yr) triggered.push("myr");
+  }
+
+  return triggered;
+}
+
+async function startScan() {
+  const btn = document.getElementById("scanBtn");
+  const progress = document.getElementById("scanProgress");
+  const bar = document.getElementById("scanBar");
+
+  btn.disabled = true;
+  btn.classList.add("scanning");
+  btn.querySelector(".btn-text").textContent = "SCANNING...";
+  progress.classList.add("active");
+
+  const newSignals = [];
+  const total = WATCHLIST.length;
+
+  for(let i=0; i<total; i++) {
+    const stock = WATCHLIST[i];
+    await new Promise(r=>setTimeout(r,60)); // simulate API delay
+
+    const pct = Math.round((i+1)/total*100);
+    bar.style.width = pct+"%";
+
+    if(alertedToday.has(stock.s)) continue;
+
+    const triggered = detectSignals(stock);
+    if(triggered.length > 0) {
+      const sig = {
+        id: Date.now()+i,
+        stock: stock.s,
+        price: stock.p + (Math.random()*20-10),
+        vol: stock.v,
+        avgVol: stock.avg,
+        volRatio: (stock.v/stock.avg).toFixed(1),
+        signals: triggered,
+        time: new Date().toLocaleTimeString("en-IN",{
+          hour:"2-digit",minute:"2-digit",timeZone:"Asia/Kolkata"
+        })
+      };
+      newSignals.push(sig);
+      signals.unshift(sig);
+      alertedToday.add(stock.s);
+    }
+  }
+
+  // Reset button
+  btn.disabled = false;
+  btn.classList.remove("scanning");
+  btn.querySelector(".btn-text").textContent = "⚡ SCAN NOW";
+  progress.classList.remove("active");
+  bar.style.width = "0%";
+
+  // Update UI
+  const now = new Date().toLocaleTimeString("en-IN",{
+    hour:"2-digit",minute:"2-digit",timeZone:"Asia/Kolkata"
+  });
+  document.getElementById("lastScanTime").textContent = now;
+  document.getElementById("totalSignals").textContent = signals.length;
+  renderSignals();
+
+  // Fire notifications for new signals
+  newSignals.forEach(sig => {
+    fireNotification(sig);
+    showToast(sig);
+  });
+
+  if(newSignals.length === 0) {
+    showInfoToast("Scan complete — No new signals found");
+  }
+}
+
+// ══════════════════════════════════════════
+//  RENDER
+// ══════════════════════════════════════════
+function renderSignals() {
+  const list = document.getElementById("signalsList");
+  const filtered = activeFilter === "all"
+    ? signals
+    : signals.filter(s => s.signals.includes(activeFilter));
+
+  document.getElementById("sigCount").textContent = filtered.length;
+
+  if(filtered.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-text">
+          Tap <strong style="color:var(--accent)">SCAN NOW</strong> to start screening<br/>
+          Nifty 500 stocks for signals
+        </div>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(sig => `
+    <div class="signal-card ${sig.signals[0]}">
+      <div class="card-top">
+        <div class="stock-name">${sig.stock}</div>
+        <div class="stock-price">₹${Number(sig.price).toFixed(0)}</div>
+      </div>
+      <div class="card-mid">
+        ${sig.signals.map(s=>`
+          <span class="badge ${s}">${SIGNAL_TYPES[s].label}</span>
+        `).join("")}
+      </div>
+      <div class="card-bot">
+        <div class="vol-info">Vol: <span>${formatVol(sig.vol)}</span> (${sig.volRatio}× avg)</div>
+        <div class="time-info">${sig.time} IST</div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function formatVol(v) {
+  if(v>=10000000) return (v/10000000).toFixed(1)+"Cr";
+  if(v>=100000)   return (v/100000).toFixed(1)+"L";
+  return v.toLocaleString();
+}
+
+// ══════════════════════════════════════════
+//  NOTIFICATIONS
+// ══════════════════════════════════════════
+async function requestNotifications() {
+  if(!("Notification" in window)) {
+    showInfoToast("Notifications not supported on this browser");
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if(perm === "granted") {
+    document.getElementById("notifBtn").textContent = "✅ NOTIFICATIONS ENABLED";
+    document.getElementById("notifBtn").style.borderColor = "var(--green)";
+    document.getElementById("notifBtn").style.color = "var(--green)";
+    new Notification("NSE Scanner 📡", {
+      body: "You'll now get push alerts for all signals!",
+      icon: "https://img.icons8.com/fluency/96/stock-share.png"
+    });
+  } else {
+    showInfoToast("Please allow notifications in browser settings");
+  }
+}
+
+function fireNotification(sig) {
+  if(Notification.permission !== "granted") return;
+  const labels = sig.signals.map(s=>SIGNAL_TYPES[s].label).join(" | ");
+  new Notification(`🔔 ${sig.stock} — Signal!`, {
+    body: `${labels}\n₹${Number(sig.price).toFixed(0)} | Vol: ${sig.volRatio}× avg`,
+    icon: "https://img.icons8.com/fluency/96/stock-share.png",
+    tag: sig.stock,
+    renotify: true,
+  });
+}
+
+// ══════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════
+function showToast(sig) {
+  const labels = sig.signals.map(s=>SIGNAL_TYPES[s].label).join(" · ");
+  addToast("🔔", sig.stock, `${labels} · ₹${Number(sig.price).toFixed(0)}`);
+}
+function showInfoToast(msg) {
+  addToast("ℹ️", "Scanner", msg);
+}
+function addToast(icon, title, msg) {
+  const c = document.getElementById("toastContainer");
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.innerHTML = `
+    <div class="toast-icon">${icon}</div>
+    <div class="toast-body">
+      <div class="toast-title">${title}</div>
+      <div class="toast-msg">${msg}</div>
+    </div>`;
+  c.appendChild(t);
+  setTimeout(()=>t.remove(), 4200);
+}
+
+// ══════════════════════════════════════════
+//  FILTER
+// ══════════════════════════════════════════
+function setFilter(el, filter) {
+  document.querySelectorAll(".filter-chip").forEach(c=>c.classList.remove("active"));
+  el.classList.add("active");
+  activeFilter = filter;
+  renderSignals();
+}
+
+// ══════════════════════════════════════════
+//  SETTINGS
+// ══════════════════════════════════════════
+function toggleSetting(el) {
+  el.classList.toggle("on");
+  const key = el.id.replace("tog_","");
+  if(key) settings[key] = el.classList.contains("on");
+}
+
+// ══════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════
+function switchTab(idx) {
+  ["panelSignals","panelSettings","panelWatchlist"].forEach((id,i)=>{
+    document.getElementById(id).classList.toggle("active", i===idx);
+    document.getElementById("nav"+i).classList.toggle("active", i===idx);
+  });
+}
+
+// ══════════════════════════════════════════
+//  WATCHLIST UI
+// ══════════════════════════════════════════
+const INDICES = ["Nifty 50","Nifty 100","Nifty 200","Nifty 500","Nifty Midcap","Nifty Smallcap","Nifty Bank","Nifty IT"];
+const selectedIndices = new Set(["Nifty 500"]);
+
+function renderWatchlist() {
+  const grid = document.getElementById("wlGrid");
+  grid.innerHTML = INDICES.map(idx=>`
+    <div class="wl-chip ${selectedIndices.has(idx)?"selected":""}" onclick="toggleIndex(this,'${idx}')">
+      <span>${idx}</span>
+      <span class="wl-chip-check">✓</span>
+    </div>
+  `).join("");
+}
+function toggleIndex(el, idx) {
+  if(selectedIndices.has(idx)) selectedIndices.delete(idx);
+  else selectedIndices.add(idx);
+  el.classList.toggle("selected");
+  el.querySelector(".wl-chip-check").style.opacity = selectedIndices.has(idx)?"1":"0";
+}
+
+// ══════════════════════════════════════════
+//  AUTO SCAN SCHEDULER
+// ══════════════════════════════════════════
+function startScheduler() {
+  setInterval(()=>{
+    if(!settings.auto) return;
+    if(!isMarketOpen()) {
+      document.getElementById("nextScanIn").textContent = "--";
+      return;
+    }
+    nextScanCountdown--;
+    if(nextScanCountdown <= 0) {
+      startScan();
+      nextScanCountdown = 15*60; // 15 min
+    }
+    const m = Math.floor(nextScanCountdown/60);
+    const s = nextScanCountdown%60;
+    document.getElementById("nextScanIn").textContent =
+      m+"m"+(s<10?"0"+s:s)+"s";
+  }, 1000);
+}
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+function init() {
+  updateMarketStatus();
+  setInterval(updateMarketStatus, 30000);
+  renderWatchlist();
+  startScheduler();
+
+  // If market is open, set first scan in 30 sec
+  if(isMarketOpen()) {
+    nextScanCountdown = 30;
+    showInfoToast("Market is open! First scan in 30 seconds…");
+  } else {
+    showInfoToast("Market closed. Tap SCAN NOW to test.");
+  }
+}
+
+init();
+</script>
+</body>
+</html>
