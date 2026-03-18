@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#0a0e1a"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="NSE Scanner"/>
+<title>NSE Scanner — Live</title>
+<link rel="manifest" href="manifest.json"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root {
+--bg:#0a0e1a; --surface:#111827; --card:#161d2e; --border:#1e2d45;
+--accent:#00e5ff; --green:#00ff88; --red:#ff3d5a; --yellow:#ffd93d;
+--purple:#a78bfa; --orange:#fb923c; --text:#e2e8f0; --muted:#64748b;
+--font-mono:'Space Mono',monospace; --font-main:'Rajdhani',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--font-main);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+.app{position:relative;z-index:1;max-width:480px;margin:0 auto;padding:0 0 80px;}
+header{padding:16px 16px 12px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(0,229,255,0.05) 0%,transparent 100%);}
+.header-top{display:flex;align-items:center;justify-content:space-between;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-icon{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#0066ff);display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 0 20px rgba(0,229,255,0.3);}
+.logo-text{font-size:20px;font-weight:700;letter-spacing:2px;color:var(--accent);}
+.logo-sub{font-size:10px;color:var(--muted);letter-spacing:1px;font-family:var(--font-mono);}
+.mkt-badge{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:20px;border:1px solid var(--border);font-size:11px;font-family:var(--font-mono);background:var(--surface);}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 6px var(--red);}
+.dot.open{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.hstats{display:flex;gap:0;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+.stat{flex:1;text-align:center;border-right:1px solid var(--border);}
+.stat:last-child{border-right:none;}
+.sv{font-size:20px;font-weight:700;font-family:var(--font-mono);color:var(--accent);}
+.sl{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+.datasrc{margin:10px 16px 0;display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.2);border-radius:8px;}
+.ds-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;flex-shrink:0;}
+.ds-txt{font-size:11px;font-family:var(--font-mono);color:var(--green);}
+.ds-delay{font-size:10px;color:var(--muted);margin-left:auto;font-family:var(--font-mono);}
+.scan-wrap{padding:12px 16px 8px;}
+.scan-btn{width:100%;padding:15px;background:linear-gradient(135deg,#003d66,#001a33);border:1px solid var(--accent);border-radius:12px;color:var(--accent);font-family:var(--font-mono);font-size:13px;font-weight:700;letter-spacing:2px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:all .2s;box-shadow:0 0 20px rgba(0,229,255,0.1);}
+.scan-btn:active{transform:scale(.98);}
+.scan-btn:disabled{opacity:.5;cursor:not-allowed;}
+.spin{width:15px;height:15px;border:2px solid rgba(0,229,255,0.3);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;display:none;}
+.scan-btn.go .spin{display:block;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.prog-wrap{height:3px;background:var(--border);border-radius:2px;margin:8px 16px 0;display:none;}
+.prog-wrap.on{display:block;}
+.prog-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:2px;transition:width .4s;box-shadow:0 0 8px var(--accent);}
+.prog-lbl{font-size:10px;color:var(--muted);font-family:var(--font-mono);padding:4px 16px 0;display:none;}
+.prog-lbl.on{display:block;}
+.filters{display:flex;gap:7px;padding:10px 16px;overflow-x:auto;scrollbar-width:none;}
+.filters::-webkit-scrollbar{display:none;}
+.chip{flex-shrink:0;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface);font-size:11px;font-family:var(--font-mono);color:var(--muted);cursor:pointer;transition:all .2s;white-space:nowrap;}
+.chip.on{border-color:var(--accent);color:var(--accent);background:rgba(0,229,255,0.08);}
+.sigh{display:flex;justify-content:space-between;align-items:center;padding:0 16px 8px;}
+.sigtitle{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-family:var(--font-mono);}
+.sigbadge{background:var(--accent);color:var(--bg);font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:var(--font-mono);}
+.siglist{padding:0 16px;display:flex;flex-direction:column;gap:9px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px;animation:sIn .3s ease;position:relative;overflow:hidden;}
+.card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:3px 0 0 3px;}
+.card.vol::before{background:var(--yellow);}
+.card.brk::before{background:var(--green);}
+.card.vcp::before{background:var(--purple);}
+.card.mtf::before{background:var(--orange);}
+.card.myr::before{background:var(--accent);}
+@keyframes sIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.ctop{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+.sname{font-size:19px;font-weight:700;letter-spacing:1px;color:#fff;}
+.sprice{font-size:17px;font-weight:700;font-family:var(--font-mono);color:var(--green);}
+.schg{font-size:11px;font-family:var(--font-mono);text-align:right;}
+.schg.up{color:var(--green);} .schg.dn{color:var(--red);}
+.badges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.badge{display:flex;align-items:center;gap:3px;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;letter-spacing:.3px;}
+.badge.vol{background:rgba(255,217,61,.12);color:var(--yellow);border:1px solid rgba(255,217,61,.25);}
+.badge.brk{background:rgba(0,255,136,.12);color:var(--green);border:1px solid rgba(0,255,136,.25);}
+.badge.vcp{background:rgba(167,139,250,.12);color:var(--purple);border:1px solid rgba(167,139,250,.25);}
+.badge.mtf{background:rgba(251,146,60,.12);color:var(--orange);border:1px solid rgba(251,146,60,.25);}
+.badge.myr{background:rgba(0,229,255,.12);color:var(--accent);border:1px solid rgba(0,229,255,.25);}
+.cbot{display:flex;justify-content:space-between;}
+.vinfo{font-size:11px;color:var(--muted);font-family:var(--font-mono);}
+.vinfo span{color:var(--yellow);}
+.ts{font-size:10px;color:var(--muted);font-family:var(--font-mono);}
+.empty{text-align:center;padding:50px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;}
+.ei{font-size:44px;opacity:.3;}
+.et{color:var(--muted);font-size:13px;line-height:1.6;}
+.errbox{margin:0 16px 8px;padding:12px 14px;background:rgba(255,61,90,.08);border:1px solid rgba(255,61,90,.3);border-radius:10px;font-size:12px;color:var(--red);font-family:var(--font-mono);display:none;}
+.errbox.on{display:block;}
+.toast-wrap{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:7px;width:calc(100% - 28px);max-width:452px;pointer-events:none;}
+.toast{background:var(--card);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;box-shadow:0 4px 30px rgba(0,229,255,.2);animation:tIn .3s ease,tOut .3s ease 3.7s forwards;pointer-events:all;}
+.tico{font-size:20px;flex-shrink:0;}
+.ttit{font-size:13px;font-weight:700;color:#fff;margin-bottom:1px;}
+.tmsg{font-size:11px;color:var(--muted);font-family:var(--font-mono);}
+@keyframes tIn{from{opacity:0;transform:translateY(-18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes tOut{from{opacity:1}to{opacity:0;transform:translateY(-18px)}}
+.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--surface);border-top:1px solid var(--border);display:flex;padding:7px 0 18px;}
+.ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:5px;font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-family:var(--font-mono);transition:color .2s;}
+.ni.on{color:var(--accent);}
+.ni-ic{font-size:19px;}
+.panel{display:none;padding:16px;}
+.panel.on{display:block;}
+.slbl{display:block;font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:10px;}
+.srow{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:7px;}
+.sn{font-size:13px;font-weight:600;}
+.sd{font-size:11px;color:var(--muted);margin-top:1px;}
+.tog{width:42px;height:22px;background:var(--border);border-radius:11px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;}
+.tog.on{background:var(--accent);}
+.tog::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .2s;}
+.tog.on::after{transform:translateX(20px);}
+.nbtn{width:100%;padding:13px;background:var(--card);border:1px solid var(--green);border-radius:10px;color:var(--green);font-family:var(--font-mono);font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;margin-top:6px;transition:all .2s;}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="header-top">
+    <div class="logo">
+      <div class="logo-icon">📡</div>
+      <div><div class="logo-text">NSE SCAN</div><div class="logo-sub">LIVE DATA · NIFTY 500</div></div>
+    </div>
+    <div class="mkt-badge"><div class="dot" id="dot"></div><span id="mktTxt" style="font-size:11px">CLOSED</span></div>
+  </div>
+  <div class="hstats">
+    <div class="stat"><div class="sv" id="stSig">0</div><div class="sl">Signals</div></div>
+    <div class="stat"><div class="sv" id="stTime">--:--</div><div class="sl">Last Scan</div></div>
+    <div class="stat"><div class="sv" id="stNext">--</div><div class="sl">Next Scan</div></div>
+    <div class="stat"><div class="sv" id="stScanned">0</div><div class="sl">Scanned</div></div>
+  </div>
+</header>
+
+<div class="datasrc">
+  <div class="ds-dot"></div>
+  <div class="ds-txt">Yahoo Finance · NSE Live</div>
+  <div class="ds-delay">~15min delay (free)</div>
+</div>
+
+<!-- SIGNALS PANEL -->
+<div class="panel on" id="pSig">
+  <div class="scan-wrap">
+    <button class="scan-btn" id="scanBtn" onclick="startScan()">
+      <div class="spin"></div>
+      <span id="btnTxt">⚡ SCAN NIFTY 500 LIVE</span>
+    </button>
+  </div>
+  <div class="prog-wrap" id="progWrap"><div class="prog-bar" id="progBar"></div></div>
+  <div class="prog-lbl" id="progLbl"></div>
+  <div class="errbox" id="errBox"></div>
+  <div class="filters">
+    <div class="chip on" onclick="setF(this,'all')">All</div>
+    <div class="chip" onclick="setF(this,'vol')">📊 Volume</div>
+    <div class="chip" onclick="setF(this,'brk')">🚀 Breakout</div>
+    <div class="chip" onclick="setF(this,'vcp')">🔺 VCP</div>
+    <div class="chip" onclick="setF(this,'mtf')">📅 Multi-TF</div>
+    <div class="chip" onclick="setF(this,'myr')">🏔️ Multi-Year</div>
+  </div>
+  <div class="sigh">
+    <span class="sigtitle">Live Signals</span>
+    <span class="sigbadge" id="sigCnt">0</span>
+  </div>
+  <div class="siglist" id="sigList">
+    <div class="empty">
+      <div class="ei">📡</div>
+      <div class="et">Tap <strong style="color:var(--accent)">SCAN NIFTY 500 LIVE</strong><br/>to fetch real NSE data and find signals</div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS PANEL -->
+<div class="panel" id="pSet">
+  <span class="slbl">Push Notifications</span>
+  <button class="nbtn" id="notifBtn" onclick="reqNotif()">🔔 ENABLE PUSH NOTIFICATIONS</button>
+  <div style="font-size:11px;color:var(--muted);margin:8px 0 20px;font-family:var(--font-mono);line-height:1.6">Alerts on your phone even when app is minimised</div>
+  <span class="slbl">Signal Detection</span>
+  <div class="srow"><div><div class="sn">📊 Volume Spike</div><div class="sd">2.5× 20-day average volume</div></div><div class="tog on" id="t_vol" onclick="togSet(this,'vol')"></div></div>
+  <div class="srow"><div><div class="sn">🚀 Breakout (50D High)</div><div class="sd">Price near or above 50-day high</div></div><div class="tog on" id="t_brk" onclick="togSet(this,'brk')"></div></div>
+  <div class="srow"><div><div class="sn">🔺 VCP Pattern</div><div class="sd">Volatility contraction + tight range</div></div><div class="tog on" id="t_vcp" onclick="togSet(this,'vcp')"></div></div>
+  <div class="srow"><div><div class="sn">📅 Multi-Timeframe</div><div class="sd">Daily + Weekly breakout aligned</div></div><div class="tog on" id="t_mtf" onclick="togSet(this,'mtf')"></div></div>
+  <div class="srow"><div><div class="sn">🏔️ Multi-Year Breakout</div><div class="sd">Breaking above all-time / 3-year high</div></div><div class="tog on" id="t_myr" onclick="togSet(this,'myr')"></div></div>
+  <br/><span class="slbl">Schedule</span>
+  <div class="srow"><div><div class="sn">Auto-scan every 15 min</div><div class="sd">Market hours only: 9:15 AM – 3:30 PM IST</div></div><div class="tog on" id="t_auto" onclick="togSet(this,'auto')"></div></div>
+  <div class="srow"><div><div class="sn">Skip weekends</div><div class="sd">No scans on Sat / Sun</div></div><div class="tog on"></div></div>
+</div>
+
+<!-- WATCHLIST PANEL -->
+<div class="panel" id="pWL">
+  <span class="slbl">Nifty 500 Watchlist (<span id="wlCount">0</span> stocks)</span>
+  <div style="font-size:11px;color:var(--muted);font-family:var(--font-mono);line-height:2" id="wlDisplay">Loading...</div>
+</div>
+
+</div><!-- end .app -->
+
+<div class="bnav">
+  <div class="ni on" id="n0" onclick="tab(0)"><span class="ni-ic">📡</span>Signals</div>
+  <div class="ni" id="n1" onclick="tab(1)"><span class="ni-ic">⚙️</span>Settings</div>
+  <div class="ni" id="n2" onclick="tab(2)"><span class="ni-ic">📋</span>Watchlist</div>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+// ══════════════════════════════════════════
+// FIX 5: Removed duplicate TITAN entry
+// ══════════════════════════════════════════
+const RAW = [
+  "RELIANCE","TCS","HDFCBANK","INFY","ICICIBANK","HINDUNILVR","ITC","SBIN",
+  "BHARTIARTL","KOTAKBANK","LT","AXISBANK","ASIANPAINT","MARUTI","TITAN",
+  "SUNPHARMA","BAJFINANCE","WIPRO","ULTRACEMCO","NESTLEIND","POWERGRID","NTPC",
+  "ONGC","JSWSTEEL","TATASTEEL","ADANIENT","ADANIPORTS","COALINDIA","DIVISLAB",
+  "DRREDDY","CIPLA","APOLLOHOSP","BAJAJFINSV","HCLTECH","TECHM","TATAMOTORS",
+  "M&M","HEROMOTOCO","EICHERMOT","BAJAJ-AUTO","BRITANNIA","DABUR","MARICO",
+  "PIDILITIND","BERGEPAINT","HAVELLS","VOLTAS","TATACONSUM","GODREJCP","COLPAL",
+  "BANKBARODA","PNB","FEDERALBNK","IDFCFIRSTB","BANDHANBNK","INDUSINDBK",
+  "HDFCLIFE","SBILIFE","ICICIGI","LICI","CHOLAFIN","MUTHOOTFIN","MANAPPURAM",
+  "ZOMATO","IRFC","RVNL","IRCTC","CONCOR","TATAPOWER","ADANIGREEN","TORNTPOWER",
+  "CESC","GAIL","IGL","MGL","PETRONET","BPCL","HPCL","IOC","HINDPETRO",
+  "ALKEM","TORNTPHARM","AUROPHARMA","LUPIN","BIOCON","GLAXO","PFIZER",
+  "ABBOTINDIA","IPCALAB","MCDOWELL-N","JUBLFOOD","DMART","TRENT","PAGEIND",
+  "BATA","NAUKRI","INDIAMART","ANGELONE","CDSL","BSE","MCX","COFORGE",
+  "MPHASIS","LTIM","PERSISTENT","OFSS","KPITTECH","TATAELXSI","CYIENT",
+  "BEL","HAL","BHEL","BEML","GRSE","NMDC","ADANIINFRA","IRB","KNRCON",
+  "PNCINFRA","HGINFRA","LALPATHLAB","METROPOLIS","MAXHEALTH","NH","FORTIS",
+  "GLENMARK","NATCOPHARM","GRANULES","AJANTPHARM","LAURUSLABS","MANKIND",
+  "TATACHEM","SRF","DEEPAKNTR","GNFC","GSFC","COROMANDEL","CHAMBAL",
+  "GSPL","ATGL","GUJGASLTD","ESKABINDIA","GRINDWELL","SKF","SCHAEFFLER",
+  "TIMKEN","NRB","GABRIEL","SUPRAJIT","ENDURANCE","MOTHERSON","MINDA",
+  "BOSCHLTD","EXIDEIND","TVSMOTOR","ASHOKLEY","ESCORTS","CEATLTD","MRF",
+  "APOLLOTYRE","BALKRISIND","MAHINDCIE","SONACOMS","JINDALSAW","RATNAMANI",
+  "WELSPUN","KALYANKJIL","PCJEWELLER","TTKPRESTIG","KAJARIA","VGUARD",
+  "CROMPTON","POLYCAB","KEI","FINOLEX","RRKABEL","APLAPOLLO","HINDZINC",
+  "HINDCOPPER","MOIL","NALCO","GMRINFRA","RITES","IRCON","NBCC","DATAPATTNS"
+];
+
+const WL = [...new Set(RAW)].map(s => s + ".NS");
+
+// ══ STATE ══
+let signals = [], alerted = new Set(), activeF = "all", cd = 0;
+let cfg = {vol:true, brk:true, vcp:true, mtf:true, myr:true, auto:true};
+
+// ══════════════════════════════════════════
+// FIX 1: encodeURIComponent(sym) fixes M&M, BAJAJ-AUTO URLs
+// FIX 3: longRange param — fetches 3y data when Multi-Year is enabled
+// FIX 4: Proxy fallback — tries allorigins first, then corsproxy.io
+// ══════════════════════════════════════════
+async function fetchQuote(sym, longRange = false) {
+  try {
+    const range = longRange ? "3y" : "3mo";
+    // FIX 1: encodeURIComponent ensures M&M, BAJAJ-AUTO are encoded correctly
+    const yUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=${range}`;
+
+    // FIX 4: Two proxies — if allorigins fails, corsproxy.io is tried
+    const proxies = [
+      `https://api.allorigins.win/get?url=${encodeURIComponent(yUrl)}`,
+      `https://corsproxy.io/?${encodeURIComponent(yUrl)}`
+    ];
+
+    let p = null;
+    for (const proxyUrl of proxies) {
+      try {
+        const r = await fetch(proxyUrl, {signal: AbortSignal.timeout(9000)});
+        if (!r.ok) continue;
+        const raw = await r.json();
+        // allorigins wraps response in .contents; corsproxy.io returns JSON directly
+        p = raw.contents ? JSON.parse(raw.contents) : raw;
+        if (p?.chart?.result) break; // got a valid response, stop trying proxies
+      } catch { continue; }
+    }
+
+    if (!p) return null;
+    const res = p?.chart?.result?.[0];
+    if (!res) return null;
+
+    const q = res.indicators.quote[0];
+    const pts = res.timestamp.map((t, i) => ({
+      c: q.close[i], h: q.high[i], l: q.low[i], v: q.volume[i], t
+    })).filter(x => x.c && x.v);
+
+    if (pts.length < 20) return null;
+    return {
+      sym: sym.replace('.NS', ''),
+      price: pts.at(-1).c,
+      prev: pts.at(-2)?.c,
+      vol: pts.at(-1).v,
+      pts
+    };
+  } catch { return null; }
+}
+
+// ══ SIGNALS ══
+const avgVol = (pts, n = 20) => pts.slice(-n-1, -1).reduce((s, d) => s + d.v, 0) / n;
+
+function chk(q) {
+  const sigs = [], av = avgVol(q.pts);
+
+  // Volume spike
+  if (cfg.vol && q.vol >= 2.5 * av) sigs.push("vol");
+
+  // 50D breakout
+  if (cfg.brk && q.pts.length >= 51) {
+    const h50 = Math.max(...q.pts.slice(-51, -1).map(d => d.h));
+    if (q.price >= h50 * 0.98) sigs.push("brk");
+  }
+
+  // VCP
+  if (cfg.vcp && q.pts.length >= 60) {
+    const pts = q.pts;
+    const sma50 = pts.slice(-50).reduce((s, x) => s + x.c, 0) / 50;
+    if (q.price >= sma50) {
+      const rng = s => {
+        const h = Math.max(...s.map(x => x.h)), l = Math.min(...s.map(x => x.l));
+        return l ? (h - l) / l : 0;
+      };
+      const [r1, r2, r3] = [rng(pts.slice(-30,-20)), rng(pts.slice(-20,-10)), rng(pts.slice(-10))];
+      if (r1 > r2 && r2 > r3 && r3 < 0.04 && q.price >= Math.max(...pts.slice(-10).map(x => x.h)) * 0.99)
+        sigs.push("vcp");
+    }
+  }
+
+  // Multi-TF (weekly + daily)
+  if (cfg.mtf && sigs.includes("brk") && q.pts.length >= 10) {
+    const wHigh = Math.max(...q.pts.slice(-10, -5).map(d => d.h));
+    if (q.price >= wHigh * 0.99) sigs.push("mtf");
+  }
+
+  // FIX 3: Multi-year breakout now uses pts from 3y range (passed in via longRange=true)
+  if (cfg.myr && q.pts.length >= 200) {
+    const h3y = Math.max(...q.pts.slice(0, -1).map(d => d.h));
+    if (q.price >= h3y * 0.99) sigs.push("myr");
+  }
+
+  return sigs;
+}
+
+// ══════════════════════════════════════════
+// FIX 2: alerted.clear() at scan start so re-scans work correctly
+// FIX 3: passes cfg.myr as longRange flag to fetchQuote
+// ══════════════════════════════════════════
+async function startScan() {
+  const btn = document.getElementById("scanBtn");
+  const pw = document.getElementById("progWrap"), pb = document.getElementById("progBar");
+  const pl = document.getElementById("progLbl"), eb = document.getElementById("errBox");
+
+  btn.disabled = true; btn.classList.add("go");
+  document.getElementById("btnTxt").textContent = "FETCHING LIVE DATA...";
+  pw.classList.add("on"); pl.classList.add("on"); eb.classList.remove("on");
+
+  const newSigs = [];
+
+  // FIX 2: Clear alerted so every fresh scan can detect signals again
+  alerted.clear();
+
+  let errs = 0, scanned = 0;
+  const total = WL.length;
+  const BATCH = 5;
+
+  for (let i = 0; i < total; i += BATCH) {
+    const batch = WL.slice(i, i + BATCH);
+    // FIX 3: pass cfg.myr so 3y data is fetched only when Multi-Year toggle is ON
+    const res = await Promise.all(batch.map(s => fetchQuote(s, cfg.myr)));
+
+    for (const q of res) {
+      scanned++;
+      if (!q) { errs++; continue; }
+      if (alerted.has(q.sym)) continue;
+
+      const sigs = chk(q);
+      if (sigs.length > 0) {
+        const av = avgVol(q.pts);
+        const pchg = q.prev ? ((q.price - q.prev) / q.prev * 100) : 0;
+        const sig = {
+          id: Date.now() + scanned, sym: q.sym, price: q.price, pchg,
+          vol: q.vol, avgVol: av, vr: (q.vol / av).toFixed(1) + "×",
+          sigs,
+          time: new Date().toLocaleTimeString("en-IN", {hour:"2-digit", minute:"2-digit", timeZone:"Asia/Kolkata"})
+        };
+        newSigs.push(sig); signals.unshift(sig); alerted.add(q.sym);
+      }
+    }
+
+    pb.style.width = Math.min(Math.round((i + BATCH) / total * 100), 100) + "%";
+    pl.textContent = `Scanning ${batch[0].replace(".NS","")}… (${Math.min(i + BATCH, total)}/${total})`;
+    document.getElementById("stScanned").textContent = scanned;
+    await new Promise(r => setTimeout(r, 350));
+  }
+
+  btn.disabled = false; btn.classList.remove("go");
+  document.getElementById("btnTxt").textContent = "⚡ SCAN NIFTY 500 LIVE";
+  pw.classList.remove("on"); pl.classList.remove("on"); pb.style.width = "0%";
+
+  const now = new Date().toLocaleTimeString("en-IN", {hour:"2-digit", minute:"2-digit", timeZone:"Asia/Kolkata"});
+  document.getElementById("stTime").textContent = now;
+  document.getElementById("stSig").textContent = signals.length;
+  cd = 15 * 60; render();
+
+  if (errs > total * 0.6) {
+    eb.textContent = "⚠️ Many stocks failed — check internet or try again in a few minutes.";
+    eb.classList.add("on");
+  }
+
+  newSigs.forEach(s => { fireNotif(s); showToast(s); });
+  if (!newSigs.length) addToast("ℹ️", "Scan Complete", "No new signals this scan");
+}
+
+// ══ RENDER ══
+const LBL = {vol:"📊 Volume Spike", brk:"🚀 Breakout (50D)", vcp:"🔺 VCP Pattern", mtf:"📅 Multi-TF", myr:"🏔️ Multi-Year Brk"};
+function fv(v) { if(v>=1e7) return (v/1e7).toFixed(1)+"Cr"; if(v>=1e5) return (v/1e5).toFixed(1)+"L"; return v?.toLocaleString()||"0"; }
+
+function render() {
+  const list = document.getElementById("sigList");
+  const f = activeF === "all" ? signals : signals.filter(s => s.sigs.includes(activeF));
+  document.getElementById("sigCnt").textContent = f.length;
+  if (!f.length) {
+    list.innerHTML = `<div class="empty"><div class="ei">📡</div><div class="et">Tap <strong style="color:var(--accent)">SCAN NIFTY 500 LIVE</strong><br/>to fetch real NSE data</div></div>`;
+    return;
+  }
+  list.innerHTML = f.map(s => {
+    const up = s.pchg >= 0;
+    return `<div class="card ${s.sigs[0]}">
+      <div class="ctop"><div class="sname">${s.sym}</div><div><div class="sprice">₹${s.price.toFixed(1)}</div><div class="schg ${up?'up':'dn'}">${up?'▲':'▼'} ${Math.abs(s.pchg).toFixed(2)}%</div></div></div>
+      <div class="badges">${s.sigs.map(t=>`<span class="badge ${t}">${LBL[t]}</span>`).join("")}</div>
+      <div class="cbot"><div class="vinfo">Vol: <span>${fv(s.vol)}</span> (${s.vr} avg)</div><div class="ts">${s.time} IST</div></div>
+    </div>`;
+  }).join("");
+}
+
+// ══ NOTIFICATIONS ══
+async function reqNotif() {
+  if (!("Notification" in window)) { addToast("⚠️","Error","Not supported on this browser"); return; }
+  const p = await Notification.requestPermission();
+  if (p === "granted") {
+    const b = document.getElementById("notifBtn");
+    b.textContent = "✅ NOTIFICATIONS ENABLED"; b.style.borderColor = "var(--green)"; b.style.color = "var(--green)";
+    new Notification("NSE Scanner 📡", {body:"Push alerts enabled for all signals!"});
+  } else addToast("⚠️","Blocked","Allow notifications in Chrome settings");
+}
+
+function fireNotif(s) {
+  if (Notification.permission !== "granted") return;
+  new Notification(`🔔 ${s.sym}`, {
+    body: `${s.sigs.map(t=>LBL[t]).join(" | ")}\n₹${s.price.toFixed(1)} · Vol ${s.vr} avg`,
+    tag: s.sym, renotify: true,
+    icon: "https://img.icons8.com/fluency/96/stock-share.png"
+  });
+}
+
+// ══ TOASTS ══
+function showToast(s) { addToast("🔔", s.sym, `${s.sigs.map(t=>LBL[t]).join(" · ")} · ₹${s.price.toFixed(1)}`); }
+function addToast(ic, ti, ms) {
+  const c = document.getElementById("toasts"), el = document.createElement("div");
+  el.className = "toast";
+  el.innerHTML = `<div class="tico">${ic}</div><div><div class="ttit">${ti}</div><div class="tmsg">${ms}</div></div>`;
+  c.appendChild(el); setTimeout(() => el.remove(), 4300);
+}
+
+// ══ UI ══
+function setF(el, f) { document.querySelectorAll(".chip").forEach(c=>c.classList.remove("on")); el.classList.add("on"); activeF=f; render(); }
+function togSet(el, k) { el.classList.toggle("on"); if(k) cfg[k] = el.classList.contains("on"); }
+function tab(i) {
+  ["pSig","pSet","pWL"].forEach((id,j)=>{
+    document.getElementById(id).classList.toggle("on", i===j);
+    document.getElementById("n"+j).classList.toggle("on", i===j);
+  });
+}
+
+// ══ MARKET STATUS ══
+function isOpen() {
+  const n = new Date(new Date().toLocaleString("en-US", {timeZone:"Asia/Kolkata"}));
+  if (n.getDay()===0 || n.getDay()===6) return false;
+  const m = n.getHours()*60 + n.getMinutes();
+  return m >= 555 && m <= 930;
+}
+function updMkt() {
+  const o = isOpen();
+  document.getElementById("dot").className = "dot" + (o ? " open" : "");
+  document.getElementById("mktTxt").textContent = o ? "OPEN" : "CLOSED";
+}
+
+// ══ SCHEDULER ══
+function startSched() {
+  setInterval(() => {
+    if (!cfg.auto || !isOpen()) { document.getElementById("stNext").textContent = "--"; return; }
+    cd--;
+    if (cd <= 0) { startScan(); cd = 15*60; return; }
+    const m = Math.floor(cd/60), s = cd%60;
+    document.getElementById("stNext").textContent = m + "m" + (s<10?"0"+s:s) + "s";
+  }, 1000);
+}
+
+// ══ WATCHLIST DISPLAY ══
+function renderWL() {
+  document.getElementById("wlCount").textContent = WL.length;
+  document.getElementById("wlDisplay").innerHTML = WL.map(s => {
+    const name = s.replace(".NS","");
+    const hit = alerted.has(name);
+    return `<span style="display:inline-block;margin:2px 6px;color:${hit?"var(--green)":"var(--muted)"};font-size:11px">${name}</span>`;
+  }).join("");
+}
+
+// ══ INIT ══
+updMkt(); setInterval(updMkt, 30000);
+renderWL(); startSched();
+if (isOpen()) { cd=60; addToast("📡","Market Open","First scan in 60 seconds…"); }
+else addToast("ℹ️","Market Closed","Tap SCAN NOW to test with latest data");
+</script>
+</body>
+</html>
