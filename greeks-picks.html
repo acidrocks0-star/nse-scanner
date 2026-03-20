@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Greeks Engine — NSE Options Picks</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0c0f; --bg2:#111318; --bg3:#181c22; --bg4:#1e222b;
+  --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+  --text:#e8eaf0; --muted:#6b7280; --faint:#3a3f4a;
+  --bull:#22c55e; --bull-bg:rgba(34,197,94,0.08); --bull-b:rgba(34,197,94,0.22);
+  --bear:#ef4444; --bear-bg:rgba(239,68,68,0.08); --bear-b:rgba(239,68,68,0.22);
+  --amber:#f59e0b; --amber-bg:rgba(245,158,11,0.08); --amber-b:rgba(245,158,11,0.22);
+  --blue:#60a5fa; --blue-bg:rgba(96,165,250,0.08); --blue-b:rgba(96,165,250,0.22);
+  --pink:#e879f9; --pink-bg:rgba(232,121,249,0.08); --pink-b:rgba(232,121,249,0.22);
+  --cyan:#22d3ee; --cyan-bg:rgba(34,211,238,0.08); --cyan-b:rgba(34,211,238,0.22);
+  --accent:#7c3aed;
+  --gamma:#f97316; --gamma-bg:rgba(249,115,22,0.08); --gamma-b:rgba(249,115,22,0.25);
+  --mono:'Space Mono',monospace; --sans:'DM Sans',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px}
+body{min-height:100vh}
+
+.header{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100}
+.logo{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text)}
+.logo span{color:var(--accent)}
+.logo .pipe{color:var(--faint)}
+.header-r{display:flex;align-items:center;gap:14px}
+.live{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);font-family:var(--mono)}
+.live::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--bull);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.clock{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--bg3);border:1px solid var(--border);padding:3px 8px;border-radius:4px}
+
+.nav-wrap{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;display:flex;gap:0;overflow-x:auto;scrollbar-width:none}
+.nav-wrap::-webkit-scrollbar{display:none}
+.nav-tab{padding:11px 15px;font-size:12px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .2s;background:none;border-left:none;border-right:none;border-top:none;font-family:var(--sans)}
+.nav-tab:hover{color:var(--text)}
+.nav-tab.active{color:var(--text);border-bottom-color:var(--gamma)}
+.tbadge{display:inline-block;margin-left:5px;font-size:10px;padding:1px 5px;border-radius:3px;font-family:var(--mono)}
+
+.main{padding:20px 24px}
+.page{display:none}.page.active{display:block}
+
+/* ── CONDITION ALERT BANNER ── */
+.condition-banner{
+  border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  display:flex;align-items:center;gap:12px;
+  border:1px solid;
+  animation:fadeIn .4s ease;
+}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.banner-icon{font-size:18px;flex-shrink:0}
+.banner-title{font-family:var(--mono);font-size:13px;font-weight:700;margin-bottom:2px}
+.banner-sub{font-size:12px;opacity:.75}
+.banner-gamma{background:var(--gamma-bg);border-color:var(--gamma-b);color:var(--gamma)}
+.banner-bull{background:var(--bull-bg);border-color:var(--bull-b);color:var(--bull)}
+.banner-bear{background:var(--bear-bg);border-color:var(--bear-b);color:var(--bear)}
+.banner-vega{background:var(--pink-bg);border-color:var(--pink-b);color:var(--pink)}
+.banner-theta{background:var(--amber-bg);border-color:var(--amber-b);color:var(--amber)}
+
+/* ── GREEK METERS ── */
+.greek-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.greek-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;position:relative;overflow:hidden}
+.greek-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:2px 2px 0 0}
+.gc-delta::before{background:var(--bull)}
+.gc-gamma::before{background:var(--gamma)}
+.gc-theta::before{background:var(--amber)}
+.gc-vega::before{background:var(--pink)}
+.gc-iv::before{background:var(--blue)}
+.greek-name{font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.greek-val{font-size:20px;font-weight:700;font-family:var(--mono);margin-bottom:3px}
+.greek-sub{font-size:11px;color:var(--muted)}
+.greek-bar{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-top:8px}
+.greek-fill{height:100%;border-radius:2px;transition:width .7s cubic-bezier(.4,0,.2,1)}
+
+/* ── PICKS GRID ── */
+.picks-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.pick-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:10px;padding:16px;
+  transition:border-color .2s,background .15s;
+  cursor:default;
+  position:relative;overflow:hidden;
+}
+.pick-card::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  opacity:0;transition:opacity .3s;
+}
+.pick-card:hover{border-color:var(--border2);background:var(--bg3)}
+.pick-card.call-card{border-left:3px solid var(--bull)}
+.pick-card.put-card{border-left:3px solid var(--bear)}
+.pick-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.pick-type{display:flex;align-items:center;gap:8px}
+.type-badge{font-family:var(--mono);font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;letter-spacing:.06em}
+.call-badge{background:var(--bull-bg);color:var(--bull);border:1px solid var(--bull-b)}
+.put-badge{background:var(--bear-bg);color:var(--bear);border:1px solid var(--bear-b)}
+.pick-strike{font-family:var(--mono);font-size:22px;font-weight:700}
+.pick-strike.call{color:var(--bull)}
+.pick-strike.put{color:var(--bear)}
+.pick-expiry{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.score-ring{
+  width:44px;height:44px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:13px;font-weight:700;
+  flex-shrink:0;
+}
+.score-high{background:rgba(249,115,22,0.15);color:var(--gamma);border:1.5px solid var(--gamma-b)}
+.score-med{background:var(--amber-bg);color:var(--amber);border:1.5px solid var(--amber-b)}
+.pick-premium{font-family:var(--mono);font-size:24px;font-weight:700;margin-bottom:4px}
+.pick-change{font-size:12px;font-family:var(--mono)}
+.chg-pos{color:var(--bull)}.chg-neg{color:var(--bear)}
+
+.pick-greeks{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0;padding:10px;background:var(--bg3);border-radius:6px}
+.pg-item{text-align:center}
+.pg-lbl{font-size:9px;color:var(--faint);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.pg-val{font-size:13px;font-weight:700;font-family:var(--mono)}
+
+.pick-conditions{margin-top:10px}
+.cond-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted)}
+.cond-item:last-child{border-bottom:none}
+.cond-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.cond-active{background:var(--gamma)}
+.cond-ok{background:var(--bull)}
+.cond-warn{background:var(--amber)}
+strong.hl{color:var(--text)}
+
+.pick-footer{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.target-chips{display:flex;gap:6px}
+.t-chip{font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:4px;font-weight:700}
+.t1-chip{background:var(--amber-bg);color:var(--amber)}
+.t2-chip{background:var(--blue-bg);color:var(--blue)}
+.sl-chip{background:var(--bear-bg);color:var(--bear)}
+.confidence{font-size:11px;color:var(--muted);font-family:var(--mono)}
+
+/* ── GAMMA BLAST SECTION ── */
+.blast-section{margin-bottom:14px}
+.section-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.section-hdr h2{font-size:13px;font-family:var(--mono);font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text)}
+.section-hdr::after{content:'';flex:1;height:1px;background:var(--border)}
+.blast-tag{font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:3px;background:var(--gamma-bg);color:var(--gamma);border:1px solid var(--gamma-b)}
+
+/* ── GAMMA BLAST CARD ── */
+.gblast-card{background:var(--bg2);border:1px solid var(--gamma-b);border-radius:10px;padding:16px;margin-bottom:10px;position:relative;overflow:hidden}
+.gblast-card::before{content:'GAMMA BLAST';position:absolute;top:10px;right:12px;font-family:var(--mono);font-size:9px;color:var(--gamma);opacity:.4;letter-spacing:.1em}
+.gblast-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+.gblast-index{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em}
+.gblast-title{font-size:16px;font-weight:700;font-family:var(--mono)}
+.gblast-score{text-align:right}
+.gblast-score .gs-val{font-size:28px;font-weight:700;font-family:var(--mono);color:var(--gamma)}
+.gblast-score .gs-lbl{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.gblast-body{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.gb-side{padding:10px;background:var(--bg3);border-radius:6px}
+.gb-side-title{font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.gb-metric{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border)}
+.gb-metric:last-child{border-bottom:none}
+.gb-metric .lbl{color:var(--muted)}
+.gb-metric .val{font-family:var(--mono);font-weight:700}
+.trigger-list{margin-top:8px}
+.trigger-item{display:flex;align-items:center;gap:8px;font-size:11px;padding:5px 0;border-bottom:1px solid var(--border)}
+.trigger-item:last-child{border-bottom:none}
+.tri-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.tri-fire{background:var(--gamma);box-shadow:0 0 6px var(--gamma)}
+.tri-ok{background:var(--bull)}
+.tri-pending{background:var(--faint)}
+.trigger-text{color:var(--muted)}
+.trigger-text .hl{color:var(--text)}
+
+/* ── IV / VEGA TABLE ── */
+.iv-table{width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)}
+.iv-table th{color:var(--faint);font-weight:400;font-size:10px;text-transform:uppercase;letter-spacing:.05em;padding:6px 10px;border-bottom:1px solid var(--border);text-align:right}
+.iv-table th:first-child{text-align:left}
+.iv-table td{padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;color:var(--muted)}
+.iv-table td:first-child{text-align:left;color:var(--text);font-weight:700}
+.iv-table tr:last-child td{border-bottom:none}
+.iv-high{color:var(--pink)!important}
+.iv-ok{color:var(--bull)!important}
+.iv-low{color:var(--blue)!important}
+
+/* ── PANEL ── */
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:12px}
+.panel-title{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.panel-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.chart-wrap{position:relative;height:200px}
+
+/* ── METRIC MINI ── */
+.mini-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.mini-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+.mini-lbl{font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.mini-val{font-size:18px;font-weight:700;font-family:var(--mono)}
+.mini-sub{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* ── CONDITION MATRIX ── */
+.matrix-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:14px}
+.matrix-cell{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center}
+.matrix-cell.active-cond{border-color:var(--gamma-b);background:var(--gamma-bg)}
+.mc-name{font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.mc-status{font-size:13px;font-weight:700;font-family:var(--mono)}
+.mc-active{color:var(--gamma)}
+.mc-forming{color:var(--amber)}
+.mc-inactive{color:var(--faint)}
+
+/* ── DISCLAIMER ── */
+.disclaimer{text-align:center;padding:16px;font-size:11px;color:var(--faint);font-family:var(--mono);border-top:1px solid var(--border);margin-top:24px}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--faint);border-radius:2px}
+
+@media(max-width:640px){
+  .main{padding:12px}
+  .greek-row{grid-template-columns:repeat(3,1fr)}
+  .picks-grid{grid-template-columns:1fr}
+  .gblast-body{grid-template-columns:1fr}
+  .mini-grid{grid-template-columns:repeat(2,1fr)}
+  .matrix-grid{grid-template-columns:repeat(2,1fr)}
+  .two-col{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">acid<span>rocks</span> <span class="pipe">/</span> nse-scanner <span class="pipe">/</span> <span style="color:var(--gamma)">greeks</span></div>
+  <div class="header-r">
+    <div class="live">LIVE ENGINE</div>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+</header>
+
+<nav class="nav-wrap" id="nav"></nav>
+<main class="main" id="pages"></main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+/* ══════════════════════════════════════════════
+   BLACK-SCHOLES + GREEKS ENGINE
+   ══════════════════════════════════════════════ */
+
+function erf(x){
+  const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+  const sign=x<0?-1:1; x=Math.abs(x);
+  const t=1/(1+p*x);
+  const y=1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+  return sign*y;
+}
+function normCDF(x){ return 0.5*(1+erf(x/Math.sqrt(2))); }
+function normPDF(x){ return Math.exp(-0.5*x*x)/Math.sqrt(2*Math.PI); }
+
+function blackScholes(S, K, T, r, sigma, type){
+  if(T<=0) return {price:Math.max(0,type==='call'?S-K:K-S),delta:type==='call'?1:0,gamma:0,theta:0,vega:0,iv:sigma};
+  const d1=(Math.log(S/K)+(r+0.5*sigma*sigma)*T)/(sigma*Math.sqrt(T));
+  const d2=d1-sigma*Math.sqrt(T);
+  const price = type==='call'
+    ? S*normCDF(d1)-K*Math.exp(-r*T)*normCDF(d2)
+    : K*Math.exp(-r*T)*normCDF(-d2)-S*normCDF(-d1);
+  const delta = type==='call' ? normCDF(d1) : normCDF(d1)-1;
+  const gamma = normPDF(d1)/(S*sigma*Math.sqrt(T));
+  const theta = type==='call'
+    ? (-(S*normPDF(d1)*sigma)/(2*Math.sqrt(T))-r*K*Math.exp(-r*T)*normCDF(d2))/365
+    : (-(S*normPDF(d1)*sigma)/(2*Math.sqrt(T))+r*K*Math.exp(-r*T)*normCDF(-d2))/365;
+  const vega = S*normPDF(d1)*Math.sqrt(T)/100;
+  return {price, delta, gamma, theta, vega, iv:sigma, d1, d2};
+}
+
+function impliedVol(S, K, T, r, marketPrice, type){
+  let lo=0.01, hi=5.0;
+  for(let i=0;i<100;i++){
+    const mid=(lo+hi)/2;
+    const p=blackScholes(S,K,T,r,mid,type).price;
+    if(Math.abs(p-marketPrice)<0.001) return mid;
+    if(p<marketPrice) lo=mid; else hi=mid;
+  }
+  return (lo+hi)/2;
+}
+
+/* ══════════════════════════════════════════════
+   GAMMA BLAST DETECTOR
+   Conditions:
+   1. High gamma at ATM (gamma > 0.003 of spot)
+   2. Low DTE (< 5 days) — gamma accelerates
+   3. PCR extreme (< 0.75 or > 1.3)
+   4. IV percentile > 60 or big IV crush potential
+   5. Spot within 0.5% of max pain or call/put wall
+   ══════════════════════════════════════════════ */
+function detectConditions(idx, greeks){
+  const conds = [];
+  const dte = idx.dte || 3;
+  const gamma = greeks.atm.gamma;
+  const gammaScore = gamma * idx.price;
+
+  const gammaBlast = gammaScore > 0.004 && dte <= 5;
+  const deltaRun = Math.abs(greeks.atm.delta) < 0.45 && idx.pcr > 1.15 && idx.chg > 0;
+  const vegaPlay = idx.vix > 16 && greeks.atm.vega > 0.08;
+  const thetaCrush = dte <= 2 && gammaScore > 0.003;
+  const pinRisk = Math.abs(idx.price - idx.maxPain)/idx.price < 0.005;
+  const shortGamma = dte <= 3 && gammaScore > 0.005;
+
+  if(gammaBlast) conds.push({type:'gamma',label:'GAMMA BLAST',sub:'High gamma + low DTE = explosive move potential',cls:'banner-gamma'});
+  if(deltaRun)   conds.push({type:'bull',label:'DELTA RUN FORMING',sub:'PCR + delta alignment → calls likely to surge',cls:'banner-bull'});
+  if(vegaPlay)   conds.push({type:'vega',label:'VEGA EXPANSION',sub:'Rising VIX + high vega = premium inflation',cls:'banner-vega'});
+  if(thetaCrush) conds.push({type:'theta',label:'THETA CRUSH ZONE',sub:'Near expiry — sell premium or scalp fast',cls:'banner-theta'});
+  if(pinRisk)    conds.push({type:'bear',label:'MAX PAIN PIN RISK',sub:`Spot glued near max pain ${fmtN(idx.maxPain)} — range-bound`,cls:'banner-bear'});
+
+  return {conds, gammaBlast, deltaRun, vegaPlay, thetaCrush, pinRisk, shortGamma, gammaScore};
+}
+
+/* ══════════════════════════════════════════════
+   OPTION PICK ENGINE
+   Selects best call/put strike based on greeks
+   ══════════════════════════════════════════════ */
+function buildOptionPicks(idx){
+  const S = idx.price, r = 0.065;
+  const dte = idx.dte || 3;
+  const T = dte/365;
+  const sigma = idx.vix/100 * Math.sqrt(252/365) * 1.1;
+  const step = idx.step || 50;
+
+  const strikes = [];
+  for(let i=-5;i<=5;i++) strikes.push(Math.round(S/step)*step + i*step);
+
+  const options = strikes.map(K=>{
+    const call = blackScholes(S, K, T, r, sigma, 'call');
+    const put  = blackScholes(S, K, T, r, sigma, 'put');
+    const moneyness = (K-S)/S;
+    const callScore = scoreOption(call, moneyness, idx, 'call', dte);
+    const putScore  = scoreOption(put,  moneyness, idx, 'put',  dte);
+    return {K, call, put, callScore, putScore, moneyness};
+  });
+
+  options.sort((a,b)=>b.callScore-a.callScore);
+  const bestCall = options[0];
+  options.sort((a,b)=>b.putScore-a.putScore);
+  const bestPut = options[0];
+
+  const atmK = Math.round(S/step)*step;
+  const atm  = blackScholes(S, atmK, T, r, sigma, 'call');
+
+  return {bestCall, bestPut, atm, atmK, options, sigma, T, dte};
+}
+
+function scoreOption(greeks, moneyness, idx, type, dte){
+  let score = 0;
+  const absM = Math.abs(moneyness);
+
+  if(absM > 0.01 && absM < 0.04) score += 30;
+  else if(absM <= 0.01) score += 20;
+  else if(absM < 0.06) score += 10;
+
+  const gammaScore = greeks.gamma * idx.price;
+  if(gammaScore > 0.004) score += 25;
+  else if(gammaScore > 0.002) score += 15;
+  else if(gammaScore > 0.001) score += 5;
+
+  const vegaScore = greeks.vega;
+  if(idx.vix > 17 && vegaScore > 0.06) score += 15;
+  else if(vegaScore > 0.04) score += 8;
+
+  if(type==='call'){
+    if(idx.pcr > 1.15) score += 15;
+    if(idx.chg > 0.3)  score += 10;
+    const distFromCallWall = (idx.callWall - idx.price)/idx.price;
+    if(distFromCallWall > 0.01 && distFromCallWall < 0.04) score += 10;
+  } else {
+    if(idx.pcr < 0.85) score += 15;
+    if(idx.chg < -0.3) score += 10;
+    const distFromPutWall = (idx.price - idx.putWall)/idx.price;
+    if(distFromPutWall > 0.01 && distFromPutWall < 0.04) score += 10;
+  }
+
+  if(dte <= 3) score += 10;
+  else if(dte <= 7) score += 5;
+
+  const thetaRatio = Math.abs(greeks.theta)/greeks.price;
+  if(thetaRatio < 0.015) score += 8;
+
+  return score;
+}
+
+function getPickTargets(K, greeks, idx, type, step){
+  const p = greeks.price;
+  const snap = v => Math.round(v/(step||50))*(step||50);
+  if(type==='call'){
+    return {
+      t1: Math.round(p * 1.4),
+      t2: Math.round(p * 2.0),
+      sl: Math.round(p * 0.5),
+      strikeT1: snap(K + idx.atr*0.6),
+      strikeT2: idx.callWall
+    };
+  } else {
+    return {
+      t1: Math.round(p * 1.4),
+      t2: Math.round(p * 2.0),
+      sl: Math.round(p * 0.5),
+      strikeT1: snap(K - idx.atr*0.6),
+      strikeT2: idx.putWall
+    };
+  }
+}
+
+/* ══════════════════════════════════════════════
+   INDICES DATA
+   ══════════════════════════════════════════════ */
+const INDICES = [
+  {id:'nifty50',  name:'Nifty 50',     short:'NIFTY',      exchange:'NSE', lot:75,  expiry:'Tue',weeklyExpiry:true,  price:22547,chg:0.62, vix:14.2,pcr:1.08,maxPain:22500,atr:185,callWall:22700,putWall:22300,step:50,  dte:3},
+  {id:'banknifty',name:'Bank Nifty',   short:'BANKNIFTY',  exchange:'NSE', lot:30,  expiry:'Monthly',weeklyExpiry:false,price:48124,chg:-0.38,vix:16.1,pcr:0.91,maxPain:48000,atr:440,callWall:48500,putWall:47500,step:100, dte:18},
+  {id:'finnifty', name:'Fin Nifty',    short:'FINNIFTY',   exchange:'NSE', lot:65,  expiry:'Monthly',weeklyExpiry:false,price:21418,chg:0.21, vix:15.3,pcr:1.14,maxPain:21400,atr:215,callWall:21600,putWall:21200,step:50,  dte:18},
+  {id:'midcap',   name:'Midcap Nifty', short:'MIDCPNIFTY', exchange:'NSE', lot:120, expiry:'Monthly',weeklyExpiry:false,price:11024,chg:0.88, vix:17.2,pcr:1.22,maxPain:11000,atr:155,callWall:11200,putWall:10800,step:25,  dte:18},
+  {id:'sensex',   name:'Sensex',       short:'SENSEX',     exchange:'BSE', lot:10,  expiry:'Thu',weeklyExpiry:true,  price:74320,chg:0.44, vix:14.8,pcr:1.02,maxPain:74000,atr:530,callWall:74500,putWall:73500,step:100, dte:5},
+  {id:'bankex',   name:'Bankex',       short:'BANKEX',     exchange:'BSE', lot:15,  expiry:'Monthly',weeklyExpiry:false,price:58240,chg:-0.22,vix:16.4,pcr:0.88,maxPain:58000,atr:580,callWall:58500,putWall:57500,step:100, dte:18},
+  {id:'niftynxt', name:'Nifty Next 50',short:'NIFTYNXT50', exchange:'NSE', lot:25,  expiry:'Monthly',weeklyExpiry:false,price:61480,chg:0.55, vix:18.2,pcr:1.18,maxPain:61000,atr:680,callWall:62000,putWall:61000,step:100, dte:18},
+  {id:'niftyit',  name:'Nifty IT',     short:'NIFTYIT',    exchange:'NSE', lot:25,  expiry:'Monthly',weeklyExpiry:false,price:33720,chg:-0.92,vix:18.4,pcr:0.78,maxPain:33500,atr:385,callWall:34000,putWall:33200,step:100, dte:18},
+];
+
+/* ══════════════════════════════════════════════
+   RENDER HELPERS
+   ══════════════════════════════════════════════ */
+function fmt(n, d=0){ return Number(n).toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function fmtN(n){ return n>=100?Math.round(n):parseFloat(n.toFixed(4)); }
+function fmtG(n){ return n.toFixed(4); }
+function pct(n){ return (n*100).toFixed(1)+'%'; }
+
+function renderPage(container, idx){
+  const picks   = buildOptionPicks(idx);
+  const cDetect = detectConditions(idx, picks);
+  const {bestCall, bestPut, atm, atmK} = picks;
+  const callTargets = getPickTargets(bestCall.K, bestCall.call, idx, 'call', idx.step);
+  const putTargets  = getPickTargets(bestPut.K,  bestPut.put,  idx, 'put',  idx.step);
+
+  const gammaScore = (atm.gamma * idx.price * 100).toFixed(2);
+  const deltaColor = atm.delta > 0.45 ? 'var(--bull)' : atm.delta < 0.3 ? 'var(--amber)' : 'var(--blue)';
+  const vegaColor  = atm.vega > 0.08 ? 'var(--pink)' : 'var(--muted)';
+  const gammaColor = cDetect.gammaBlast ? 'var(--gamma)' : parseFloat(gammaScore)>0.3?'var(--amber)':'var(--muted)';
+  const ivPct      = (picks.sigma * 100).toFixed(1);
+  const callScoreLabel = bestCall.callScore >= 70 ? 'score-high' : 'score-med';
+  const putScoreLabel  = bestPut.putScore  >= 70 ? 'score-high' : 'score-med';
+
+  /* condition banners */
+  let bannersHTML = cDetect.conds.map(c=>`
+    <div class="condition-banner ${c.cls}">
+      <div class="banner-title">${c.label}</div>
+      <div class="banner-sub">${c.sub}</div>
+    </div>`).join('');
+  if(!bannersHTML) bannersHTML = `
+    <div class="condition-banner" style="background:var(--bg3);border-color:var(--border);color:var(--muted)">
+      <div class="banner-title" style="color:var(--text)">No extreme conditions active</div>
+      <div class="banner-sub">Greeks are stable — normal premium pricing environment</div>
+    </div>`;
+
+  /* condition matrix */
+  const matrixItems = [
+    {name:'Gamma blast',  status: cDetect.gammaBlast?'ACTIVE':'Forming', active:cDetect.gammaBlast, forming:parseFloat(gammaScore)>0.25},
+    {name:'Delta run',    status: cDetect.deltaRun?'ACTIVE':'Watch',    active:cDetect.deltaRun,  forming:idx.pcr>1.0&&idx.chg>0},
+    {name:'Vega expand',  status: cDetect.vegaPlay?'ACTIVE':'Low',      active:cDetect.vegaPlay,  forming:idx.vix>15},
+    {name:'Theta crush',  status: cDetect.thetaCrush?'ACTIVE':'Normal', active:cDetect.thetaCrush,forming:picks.dte<=5},
+    {name:'Pin risk',     status: cDetect.pinRisk?'ACTIVE':'Clear',     active:cDetect.pinRisk,   forming:Math.abs(idx.price-idx.maxPain)/idx.price<0.012},
+    {name:'Short gamma',  status: cDetect.shortGamma?'ACTIVE':'OK',     active:cDetect.shortGamma,forming:picks.dte<=4},
+  ];
+  let matrixHTML = matrixItems.map(m=>`
+    <div class="matrix-cell ${m.active?'active-cond':''}">
+      <div class="mc-name">${m.name}</div>
+      <div class="mc-status ${m.active?'mc-active':m.forming?'mc-forming':'mc-inactive'}">${m.status}</div>
+    </div>`).join('');
+
+  /* call pick conditions */
+  const callConds = buildPickConditions(bestCall.K, bestCall.call, idx, 'call', picks);
+  const putConds  = buildPickConditions(bestPut.K,  bestPut.put,  idx, 'put',  picks);
+
+  /* IV table across strikes */
+  const ivStrikes = [-2,-1,0,1,2].map(i=>{
+    const K = atmK + i*(idx.step||50);
+    const T = picks.T, r = 0.065, sig = picks.sigma;
+    const c = blackScholes(idx.price, K, T, r, sig, 'call');
+    const p = blackScholes(idx.price, K, T, r, sig, 'put');
+    const skew = sig * (1 + i*0.015);
+    return {K, callIV:(skew*100).toFixed(1), putIV:((skew*1.02)*100).toFixed(1),
+      callGamma: (c.gamma*idx.price).toFixed(4),
+      callVega:  c.vega.toFixed(3),
+      callTheta: c.theta.toFixed(2),
+      type: i===0?'ATM':i<0?'ITM':'OTM'};
+  });
+  let ivTableHTML = ivStrikes.map(r=>`
+    <tr>
+      <td>${fmt(r.K)}</td>
+      <td style="color:var(--muted);font-size:10px">${r.type}</td>
+      <td class="${parseFloat(r.callIV)>20?'iv-high':parseFloat(r.callIV)<14?'iv-low':'iv-ok'}">${r.callIV}%</td>
+      <td class="${parseFloat(r.putIV)>20?'iv-high':parseFloat(r.putIV)<14?'iv-low':'iv-ok'}">${r.putIV}%</td>
+      <td>${r.callGamma}</td>
+      <td>${r.callVega}</td>
+      <td style="color:var(--amber)">${r.callTheta}</td>
+    </tr>`).join('');
+
+  container.innerHTML = `
+  <!-- BANNERS -->
+  ${bannersHTML}
+
+  <!-- GREEK METERS -->
+  <div class="greek-row">
+    <div class="greek-card gc-delta">
+      <div class="greek-name">Delta (ATM)</div>
+      <div class="greek-val" style="color:${deltaColor}">${fmtG(atm.delta)}</div>
+      <div class="greek-sub">Price sensitivity</div>
+      <div class="greek-bar"><div class="greek-fill" style="width:${Math.abs(atm.delta)*100}%;background:var(--bull)"></div></div>
+    </div>
+    <div class="greek-card gc-gamma">
+      <div class="greek-name">Gamma (ATM)</div>
+      <div class="greek-val" style="color:${gammaColor}">${fmtG(atm.gamma)}</div>
+      <div class="greek-sub">Score: ${gammaScore}${cDetect.gammaBlast?' 🔥':''}</div>
+      <div class="greek-bar"><div class="greek-fill" style="width:${Math.min(100,parseFloat(gammaScore)*25)}%;background:var(--gamma)"></div></div>
+    </div>
+    <div class="greek-card gc-theta">
+      <div class="greek-name">Theta (ATM)</div>
+      <div class="greek-val" style="color:var(--amber)">${atm.theta.toFixed(2)}</div>
+      <div class="greek-sub">Daily decay / pt</div>
+      <div class="greek-bar"><div class="greek-fill" style="width:${Math.min(100,Math.abs(atm.theta)*200)}%;background:var(--amber)"></div></div>
+    </div>
+    <div class="greek-card gc-vega">
+      <div class="greek-name">Vega (ATM)</div>
+      <div class="greek-val" style="color:${vegaColor}">${atm.vega.toFixed(3)}</div>
+      <div class="greek-sub">Per 1% VIX move</div>
+      <div class="greek-bar"><div class="greek-fill" style="width:${Math.min(100,atm.vega*500)}%;background:var(--pink)"></div></div>
+    </div>
+    <div class="greek-card gc-iv">
+      <div class="greek-name">IV (ATM)</div>
+      <div class="greek-val" style="color:var(--blue)">${ivPct}%</div>
+      <div class="greek-sub">DTE: ${picks.dte} days</div>
+      <div class="greek-bar"><div class="greek-fill" style="width:${Math.min(100,parseFloat(ivPct)*2.5)}%;background:var(--blue)"></div></div>
+    </div>
+  </div>
+
+  <!-- CONDITION MATRIX -->
+  <div class="section-hdr"><h2>Condition matrix</h2><span class="blast-tag">${cDetect.conds.length} active</span></div>
+  <div class="matrix-grid">${matrixHTML}</div>
+
+  <!-- OPTION PICKS -->
+  <div class="section-hdr"><h2>Recommended options</h2><span class="blast-tag">Greeks-scored</span></div>
+  <div class="picks-grid">
+
+    <!-- CALL PICK -->
+    <div class="pick-card call-card">
+      <div class="pick-header">
+        <div class="pick-type">
+          <span class="type-badge call-badge">CALL</span>
+          <div>
+            <div class="pick-strike call">${fmt(bestCall.K)}</div>
+            <div class="pick-expiry">${idx.expiry} expiry · ${picks.dte} DTE</div>
+          </div>
+        </div>
+        <div class="score-ring ${callScoreLabel}">${bestCall.callScore}</div>
+      </div>
+      <div style="margin-bottom:8px">
+        <div class="pick-premium" style="color:var(--bull)">₹${fmtN(bestCall.call.price)}</div>
+        <div class="pick-change chg-pos">Expected move: +${pct(Math.abs(bestCall.call.delta)*0.008)}/pt</div>
+      </div>
+      <div class="pick-greeks">
+        <div class="pg-item"><div class="pg-lbl">Delta</div><div class="pg-val" style="color:var(--bull)">${bestCall.call.delta.toFixed(3)}</div></div>
+        <div class="pg-item"><div class="pg-lbl">Gamma</div><div class="pg-val" style="color:var(--gamma)">${bestCall.call.gamma.toFixed(4)}</div></div>
+        <div class="pg-item"><div class="pg-lbl">Theta</div><div class="pg-val" style="color:var(--amber)">${bestCall.call.theta.toFixed(2)}</div></div>
+        <div class="pg-item"><div class="pg-lbl">Vega</div><div class="pg-val" style="color:var(--pink)">${bestCall.call.vega.toFixed(3)}</div></div>
+      </div>
+      <div class="pick-conditions">
+        ${callConds.map(c=>`<div class="cond-item"><div class="cond-dot ${c.active?'cond-active':c.ok?'cond-ok':'cond-warn'}"></div><span>${c.text}</span></div>`).join('')}
+      </div>
+      <div class="pick-footer">
+        <div class="target-chips">
+          <span class="t-chip t1-chip">T1 ₹${callTargets.t1}</span>
+          <span class="t-chip t2-chip">T2 ₹${callTargets.t2}</span>
+          <span class="t-chip sl-chip">SL ₹${callTargets.sl}</span>
+        </div>
+        <span class="confidence">S-T1: ${fmt(callTargets.strikeT1)}</span>
+      </div>
+    </div>
+
+    <!-- PUT PICK -->
+    <div class="pick-card put-card">
+      <div class="pick-header">
+        <div class="pick-type">
+          <span class="type-badge put-badge">PUT</span>
+          <div>
+            <div class="pick-strike put">${fmt(bestPut.K)}</div>
+            <div class="pick-expiry">${idx.expiry} expiry · ${picks.dte} DTE</div>
+          </div>
+        </div>
+        <div class="score-ring ${putScoreLabel}">${bestPut.putScore}</div>
+      </div>
+      <div style="margin-bottom:8px">
+        <div class="pick-premium" style="color:var(--bear)">₹${fmtN(bestPut.put.price)}</div>
+        <div class="pick-change chg-neg">Expected move: +${pct(Math.abs(bestPut.put.delta)*0.008)}/pt</div>
+      </div>
+      <div class="pick-greeks">
+        <div class="pg-item"><div class="pg-lbl">Delta</div><div class="pg-val" style="color:var(--bear)">${bestPut.put.delta.toFixed(3)}</div></div>
+        <div class="pg-item"><div class="pg-lbl">Gamma</div><div class="pg-val" style="color:var(--gamma)">${bestPut.put.gamma.toFixed(4)}</div></div>
+        <div class="pg-item"><div class="pg-lbl">Theta</div><div class="pg-val" style="color:var(--amber)">${bestPut.put.theta.toFixed(2)}</div></div>
+        <div class="pg-item"><div class="pg-lbl">Vega</div><div class="pg-val" style="color:var(--pink)">${bestPut.put.vega.toFixed(3)}</div></div>
+      </div>
+      <div class="pick-conditions">
+        ${putConds.map(c=>`<div class="cond-item"><div class="cond-dot ${c.active?'cond-active':c.ok?'cond-ok':'cond-warn'}"></div><span>${c.text}</span></div>`).join('')}
+      </div>
+      <div class="pick-footer">
+        <div class="target-chips">
+          <span class="t-chip t1-chip">T1 ₹${putTargets.t1}</span>
+          <span class="t-chip t2-chip">T2 ₹${putTargets.t2}</span>
+          <span class="t-chip sl-chip">SL ₹${putTargets.sl}</span>
+        </div>
+        <span class="confidence">S-T1: ${fmt(putTargets.strikeT1)}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAMMA BLAST DETAILS (if active) -->
+  ${cDetect.gammaBlast ? renderGammaBlast(idx, picks, cDetect) : ''}
+
+  <!-- IV + GREEKS TABLE -->
+  <div class="panel">
+    <div class="panel-title">Greeks across strikes — full skew view</div>
+    <div style="overflow-x:auto">
+      <table class="iv-table">
+        <thead><tr>
+          <th style="text-align:left">Strike</th><th>Type</th>
+          <th>Call IV</th><th>Put IV</th>
+          <th>Gamma×S</th><th>Vega</th><th>Theta/day</th>
+        </tr></thead>
+        <tbody>${ivTableHTML}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- OI CHART -->
+  <div class="panel">
+    <div class="panel-title">Delta vs Gamma profile across strikes</div>
+    <div class="chart-wrap"><canvas id="gc-${idx.id}"></canvas></div>
+  </div>
+  `;
+
+  setTimeout(()=>renderGreeksChart(idx, picks), 80);
+}
+
+function buildPickConditions(K, greeks, idx, type, picks){
+  const conds = [];
+  const gammaScore = (greeks.gamma * idx.price * 100).toFixed(2);
+  const moneyness = ((K - idx.price)/idx.price*100).toFixed(2);
+
+  conds.push({
+    active: parseFloat(gammaScore) > 0.3,
+    ok:     parseFloat(gammaScore) > 0.15,
+    text:   `Gamma score ${gammaScore} — ${parseFloat(gammaScore)>0.3?'BLAST zone':parseFloat(gammaScore)>0.15?'good':'weak'}`
+  });
+  if(type==='call'){
+    conds.push({active:idx.pcr>1.2, ok:idx.pcr>1.0, text:`PCR ${idx.pcr} — ${idx.pcr>1.2?'strong put writing fuel':idx.pcr>1.0?'mild bullish':'call overhang risk'}`});
+    conds.push({active:idx.chg>0.5, ok:idx.chg>0,   text:`Index ${idx.chg>0?'up':'down'} ${Math.abs(idx.chg)}% today — ${idx.chg>0?'momentum aligned':'against trend'}`});
+    const dist = ((idx.callWall - K)/idx.price*100).toFixed(1);
+    conds.push({active:parseFloat(dist)>1&&parseFloat(dist)<4, ok:parseFloat(dist)>0, text:`Call wall ${fmt(idx.callWall)} is ${dist}% away — ${parseFloat(dist)<2?'near target':parseFloat(dist)<5?'room to run':'far out'}`});
+  } else {
+    conds.push({active:idx.pcr<0.8, ok:idx.pcr<1.0, text:`PCR ${idx.pcr} — ${idx.pcr<0.8?'heavy call hedging fuel':idx.pcr<1.0?'mild bearish':'put writing dominance'}`});
+    conds.push({active:idx.chg<-0.5, ok:idx.chg<0,  text:`Index ${idx.chg>0?'up':'down'} ${Math.abs(idx.chg)}% today — ${idx.chg<0?'momentum aligned':'against trend'}`});
+    const dist = ((K - idx.putWall)/idx.price*100).toFixed(1);
+    conds.push({active:parseFloat(dist)>1&&parseFloat(dist)<4, ok:parseFloat(dist)>0, text:`Put wall ${fmt(idx.putWall)} is ${dist}% away — ${parseFloat(dist)<2?'near target':parseFloat(dist)<5?'room to run':'far out'}`});
+  }
+  conds.push({
+    active: picks.dte <= 3,
+    ok:     picks.dte <= 7,
+    text:   `${picks.dte} DTE — ${picks.dte<=3?'gamma accelerating':picks.dte<=7?'near expiry, gamma rising':'normal time decay'}`
+  });
+  return conds;
+}
+
+function renderGammaBlast(idx, picks, cDetect){
+  const gammaScore = cDetect.gammaScore.toFixed(4);
+  const triggers = [
+    {fire:true,  text:`ATM gamma × spot = <span class="hl">${(cDetect.gammaScore*100).toFixed(3)}</span> — above blast threshold 0.004`},
+    {fire:picks.dte<=5, text:`DTE = <span class="hl">${picks.dte}</span> — ${picks.dte<=5?'low DTE, gamma curve steep':'not yet in gamma spike zone'}`},
+    {fire:Math.abs(idx.price-idx.maxPain)/idx.price<0.01, text:`Spot ${Math.abs(((idx.price-idx.maxPain)/idx.price)*100).toFixed(2)}% from max pain — ${Math.abs(idx.price-idx.maxPain)/idx.price<0.01?'pinned near max pain, explosive break likely':'max pain influence moderate'}`},
+    {fire:idx.pcr>1.2||idx.pcr<0.8, text:`PCR ${idx.pcr} — ${idx.pcr>1.2?'extreme put writing':idx.pcr<0.8?'extreme call accumulation':'balanced, less fuel'}`},
+    {fire:idx.vix>16, text:`VIX ${idx.vix} — ${idx.vix>16?'elevated, premium expansion mode':'low VIX, gamma dominates over vega'}`},
+  ];
+  return `
+  <div class="blast-section">
+    <div class="section-hdr"><h2>Gamma blast analysis</h2><span class="blast-tag" style="animation:fadeIn .3s">ACTIVE</span></div>
+    <div class="gblast-card">
+      <div class="gblast-header">
+        <div>
+          <div class="gblast-index">${idx.short} · ${idx.exchange} · ${idx.dte} DTE</div>
+          <div class="gblast-title" style="color:var(--gamma)">Gamma blast conditions forming</div>
+        </div>
+        <div class="gblast-score">
+          <div class="gs-val">${(cDetect.gammaScore*10000).toFixed(1)}</div>
+          <div class="gs-lbl">gamma intensity</div>
+        </div>
+      </div>
+      <div class="gblast-body">
+        <div class="gb-side">
+          <div class="gb-side-title">What this means</div>
+          <div class="gb-metric"><span class="lbl">Expected move</span><span class="val" style="color:var(--gamma)">±${fmt(Math.round(picks.atm.gamma*idx.price*idx.price*2))} pts</span></div>
+          <div class="gb-metric"><span class="lbl">Premium multiplier</span><span class="val" style="color:var(--gamma)">2–4× on a 1% move</span></div>
+          <div class="gb-metric"><span class="lbl">Theta risk</span><span class="val" style="color:var(--amber)">₹${Math.abs(picks.atm.theta).toFixed(2)}/day</span></div>
+          <div class="gb-metric"><span class="lbl">Vega risk</span><span class="val" style="color:var(--pink)">₹${picks.atm.vega.toFixed(2)} per 1% IV</span></div>
+          <div class="gb-metric"><span class="lbl">Best strategy</span><span class="val" style="color:var(--text)">Buy ATM straddle / scalp calls + puts</span></div>
+        </div>
+        <div class="gb-side">
+          <div class="gb-side-title">Trigger checklist</div>
+          <div class="trigger-list">
+            ${triggers.map(t=>`<div class="trigger-item"><div class="tri-dot ${t.fire?'tri-fire':'tri-pending'}"></div><div class="trigger-text">${t.text}</div></div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderGreeksChart(idx, picks){
+  const step = idx.step || 50;
+  const atmK = Math.round(idx.price/step)*step;
+  const strikes = [], deltas=[], gammas=[], thetas=[];
+  for(let i=-5;i<=5;i++){
+    const K = atmK + i*step;
+    const g = blackScholes(idx.price, K, picks.T, 0.065, picks.sigma, 'call');
+    strikes.push(fmt(K));
+    deltas.push(parseFloat(g.delta.toFixed(4)));
+    gammas.push(parseFloat((g.gamma*idx.price).toFixed(4)));
+    thetas.push(parseFloat(Math.abs(g.theta).toFixed(4)));
+  }
+  const ctx = document.getElementById('gc-'+idx.id);
+  if(!ctx||ctx._ci) return;
+  const c = new Chart(ctx,{
+    type:'line',
+    data:{
+      labels:strikes,
+      datasets:[
+        {label:'Delta',data:deltas,borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,0.08)',borderWidth:2,tension:.4,yAxisID:'y'},
+        {label:'Gamma×S',data:gammas,borderColor:'#f97316',backgroundColor:'rgba(249,115,22,0.08)',borderWidth:2,tension:.4,yAxisID:'y2'},
+        {label:'|Theta|',data:thetas,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.06)',borderWidth:1.5,tension:.4,borderDash:[4,3],yAxisID:'y2'},
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#6b7280',font:{size:9,family:'Space Mono'}},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{ticks:{color:'#22c55e',font:{size:9,family:'Space Mono'}},grid:{color:'rgba(255,255,255,0.04)'},title:{display:true,text:'Delta',color:'#22c55e',font:{size:10}}},
+        y2:{position:'right',ticks:{color:'#f97316',font:{size:9,family:'Space Mono'}},grid:{display:false},title:{display:true,text:'Gamma×S / |Theta|',color:'#f97316',font:{size:10}}}
+      }
+    }
+  });
+  ctx._ci = c;
+}
+
+/* ── OVERVIEW PAGE ── */
+function renderOverview(container){
+  const rows = INDICES.map(idx=>{
+    const picks = buildOptionPicks(idx);
+    const cDetect = detectConditions(idx, picks);
+    const gammaScore = (cDetect.gammaScore*100).toFixed(2);
+    const topCond = cDetect.conds[0];
+    const chgCls = idx.chg>=0?'chg-pos':'chg-neg';
+    const chgSign = idx.chg>=0?'+':'';
+    return `
+    <div style="background:var(--bg2);border:1px solid ${cDetect.gammaBlast?'var(--gamma-b)':'var(--border)'};border-radius:8px;padding:14px 16px;cursor:pointer;transition:all .2s" onclick="switchPage('${idx.id}')">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+        <div>
+          <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">${idx.short} · ${idx.exchange}</div>
+          <div style="font-size:18px;font-weight:700;font-family:var(--mono)">${fmt(idx.price)}</div>
+          <div class="${chgCls}" style="font-size:11px;font-family:var(--mono)">${chgSign}${idx.chg}%</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:3px">Gamma</div>
+          <div style="font-size:16px;font-weight:700;font-family:var(--mono);color:${cDetect.gammaBlast?'var(--gamma)':parseFloat(gammaScore)>0.2?'var(--amber)':'var(--muted)'}">${gammaScore}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">
+        <div style="text-align:center;background:var(--bg3);border-radius:5px;padding:5px">
+          <div style="font-size:9px;color:var(--muted);font-family:var(--mono)">IV</div>
+          <div style="font-size:12px;font-weight:700;font-family:var(--mono);color:var(--blue)">${(picks.sigma*100).toFixed(1)}%</div>
+        </div>
+        <div style="text-align:center;background:var(--bg3);border-radius:5px;padding:5px">
+          <div style="font-size:9px;color:var(--muted);font-family:var(--mono)">DTE</div>
+          <div style="font-size:12px;font-weight:700;font-family:var(--mono);color:${idx.dte<=3?'var(--gamma)':idx.dte<=7?'var(--amber)':'var(--muted)'}">${idx.dte}</div>
+        </div>
+        <div style="text-align:center;background:var(--bg3);border-radius:5px;padding:5px">
+          <div style="font-size:9px;color:var(--muted);font-family:var(--mono)">PCR</div>
+          <div style="font-size:12px;font-weight:700;font-family:var(--mono);color:${idx.pcr>1.15?'var(--bull)':idx.pcr<0.8?'var(--bear)':'var(--muted)'}">${idx.pcr}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:11px;color:var(--muted)">
+          ${topCond ? `<span style="color:${topCond.cls.includes('gamma')?'var(--gamma)':topCond.cls.includes('bull')?'var(--bull)':topCond.cls.includes('bear')?'var(--bear)':topCond.cls.includes('vega')?'var(--pink)':'var(--amber)'}">${topCond.label}</span>` : '<span style="color:var(--faint)">No active condition</span>'}
+        </div>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--faint)">${cDetect.conds.length} condition${cDetect.conds.length!==1?'s':''}</span>
+      </div>
+    </div>`;
+  });
+
+  container.innerHTML = `
+  <div style="background:var(--gamma-bg);border:1px solid var(--gamma-b);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
+    <div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--gamma);margin-bottom:2px">Greeks engine — all indices</div>
+      <div style="font-size:12px;color:var(--muted)">Black-Scholes computed · Gamma blast detector · Strike picker · Click any index for full analysis</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+    ${rows.join('')}
+  </div>`;
+}
+
+/* ── NAV BUILD ── */
+const nav = document.getElementById('nav');
+const pages = document.getElementById('pages');
+const ALL = [{id:'overview',name:'All Indices',short:'OVERVIEW'}, ...INDICES];
+
+ALL.forEach(idx=>{
+  const btn = document.createElement('button');
+  btn.className='nav-tab'+(idx.id==='overview'?' active':'');
+  btn.dataset.id=idx.id;
+  if(idx.price){
+    const picks=buildOptionPicks(idx);
+    const cd=detectConditions(idx,picks);
+    const activeConds=cd.conds.length;
+    btn.innerHTML=`${idx.short}${activeConds?`<span class="tbadge" style="background:var(--gamma-bg);color:var(--gamma);border:1px solid var(--gamma-b)">${activeConds}</span>`:''}`;
+  } else {
+    btn.textContent=idx.short||idx.name;
+  }
+  btn.onclick=()=>switchPage(idx.id);
+  nav.appendChild(btn);
+
+  const page=document.createElement('div');
+  page.className='page'+(idx.id==='overview'?' active':'');
+  page.dataset.id=idx.id;
+  pages.appendChild(page);
+
+  if(idx.id==='overview') renderOverview(page);
+  else renderPage(page,idx);
+});
+
+window.switchPage=function(id){
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.toggle('active',b.dataset.id===id));
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.dataset.id===id));
+};
+
+/* ── CLOCK ── */
+function tick(){
+  const ist=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+  const p=n=>n.toString().padStart(2,'0');
+  document.getElementById('clock').textContent=`IST ${p(ist.getHours())}:${p(ist.getMinutes())}:${p(ist.getSeconds())}`;
+}
+tick();setInterval(tick,1000);
+</script>
+
+<div class="disclaimer">
+  Prices & greeks are illustrative — feed live spot, VIX, IV from your NSE data source. Black-Scholes engine is client-side. Not financial advice. · acidrocks0-star/nse-scanner
+</div>
+</body>
+</html>
